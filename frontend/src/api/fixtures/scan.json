@@ -1,0 +1,187 @@
+{
+  "categories": [
+    {
+      "id": "app_cache",
+      "root": "/Users/demo/Library/Caches",
+      "total_bytes": 8806400,
+      "items": [
+        {
+          "id": "app_cache:/Users/demo/Library/Caches/com.google.Chrome",
+          "path": "/Users/demo/Library/Caches/com.google.Chrome",
+          "size_bytes": 4300800,
+          "last_used_ms": 1791887001604,
+          "partial": false
+        },
+        {
+          "id": "app_cache:/Users/demo/Library/Caches/com.spotify.client",
+          "path": "/Users/demo/Library/Caches/com.spotify.client",
+          "size_bytes": 2662400,
+          "last_used_ms": 1791887001606,
+          "partial": false
+        },
+        {
+          "id": "app_cache:/Users/demo/Library/Caches/Homebrew",
+          "path": "/Users/demo/Library/Caches/Homebrew",
+          "size_bytes": 1843200,
+          "last_used_ms": 1791887001607,
+          "partial": false
+        }
+      ],
+      "default_selected": true,
+      "removal": "permanent",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false
+    },
+    {
+      "id": "trash",
+      "root": "/Users/demo/.Trash",
+      "total_bytes": 716800,
+      "items": [
+        {
+          "id": "trash:/Users/demo/.Trash/old-report.pdf",
+          "path": "/Users/demo/.Trash/old-report.pdf",
+          "size_bytes": 716800,
+          "last_used_ms": 1791887001611,
+          "partial": false
+        }
+      ],
+      "default_selected": true,
+      "removal": "permanent",
+      "needs_admin": false,
+      "needs_full_disk_access": true,
+      "unreadable": false
+    },
+    {
+      "id": "old_downloads",
+      "root": "/Users/demo/Downloads",
+      "total_bytes": 5324800,
+      "items": [
+        {
+          "id": "old_downloads:/Users/demo/Downloads/installer.dmg",
+          "path": "/Users/demo/Downloads/installer.dmg",
+          "size_bytes": 5324800,
+          "last_used_ms": 1791887001612,
+          "partial": false
+        }
+      ],
+      "default_selected": false,
+      "removal": "trash",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false
+    },
+    {
+      "id": "logs",
+      "root": "/Users/demo/Library/Logs",
+      "total_bytes": 430080,
+      "items": [
+        {
+          "id": "logs:/Users/demo/Library/Logs/DiagnosticReports",
+          "path": "/Users/demo/Library/Logs/DiagnosticReports",
+          "size_bytes": 307200,
+          "last_used_ms": 1791887001608,
+          "partial": false
+        },
+        {
+          "id": "logs:/Users/demo/Library/Logs/Homebrew",
+          "path": "/Users/demo/Library/Logs/Homebrew",
+          "size_bytes": 122880,
+          "last_used_ms": 1791887001608,
+          "partial": false
+        }
+      ],
+      "default_selected": true,
+      "removal": "permanent",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false
+    },
+    {
+      "id": "ai_cache",
+      "root": "/Users/demo",
+      "total_bytes": 11866000000,
+      "items": [
+        {
+          "id": "ai_cache:/Users/demo/Library/Application Support/Claude/vm_bundles",
+          "path": "/Users/demo/Library/Application Support/Claude/vm_bundles",
+          "size_bytes": 11200000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        },
+        {
+          "id": "ai_cache:/Users/demo/Library/Application Support/Claude/Cache",
+          "path": "/Users/demo/Library/Application Support/Claude/Cache",
+          "size_bytes": 563000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        },
+        {
+          "id": "ai_cache:/Users/demo/Library/Application Support/Cursor/logs",
+          "path": "/Users/demo/Library/Application Support/Cursor/logs",
+          "size_bytes": 59000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        },
+        {
+          "id": "ai_cache:/Users/demo/.codex/cache",
+          "path": "/Users/demo/.codex/cache",
+          "size_bytes": 44000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        }
+      ],
+      "default_selected": false,
+      "removal": "permanent",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false,
+      "partial": false,
+      "only": [
+        "Library/Application Support/Claude/vm_bundles",
+        "Library/Application Support/Claude/Cache",
+        "Library/Application Support/Cursor/logs",
+        ".codex/cache"
+      ]
+    },
+    {
+      "id": "ai_history",
+      "root": "/Users/demo",
+      "total_bytes": 471000000,
+      "items": [
+        {
+          "id": "ai_history:/Users/demo/.codex/archived_sessions/rollout-2026-03-07T22-08-41.jsonl",
+          "path": "/Users/demo/.codex/archived_sessions/rollout-2026-03-07T22-08-41.jsonl",
+          "size_bytes": 412000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        },
+        {
+          "id": "ai_history:/Users/demo/.claude/projects/-Users-demo-code-web/5b1c.jsonl",
+          "path": "/Users/demo/.claude/projects/-Users-demo-code-web/5b1c.jsonl",
+          "size_bytes": 38000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        },
+        {
+          "id": "ai_history:/Users/demo/.codex/sessions/2026/08/02",
+          "path": "/Users/demo/.codex/sessions/2026/08/02",
+          "size_bytes": 21000000,
+          "last_used_ms": 1757000000000,
+          "partial": false
+        }
+      ],
+      "default_selected": false,
+      "removal": "trash",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false,
+      "partial": false,
+      "only": [
+        ".codex/archived_sessions/rollout-2026-03-07T22-08-41.jsonl",
+        ".claude/projects/-Users-demo-code-web/5b1c.jsonl",
+        ".codex/sessions/2026/08/02"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[package]
+name = "pikaclean"
+version = "0.1.0"
+edition = "2021"
+description = "Pika Clean"
+
+[lib]
+name = "pikaclean_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = "0.39.6"
+libc = "0.2.190"
+objc2 = "0.6"
+trash = "5.2.9"
+
+# 自测：让应用自己走一遍真实流程并截取自己的窗口。只在开发时用，正式包不带。
+# 用法见 backend/src/selftest.rs 开头。
+block2 = { version = "0.6", optional = true }
+core-foundation = "0.10"
+plist = "1.10.1"
+ureq = "2"
+security-framework = "3.7.0"
+tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
+
+[features]
+selftest = ["dep:block2"]
+
+# release 也开增量编译：每次打包都会重编本 crate（前端产物一变就触发），开了之后从约 23 秒降到 4~9 秒。
+# 只影响本 crate，依赖库照旧完整优化；代价是包大一点点（约 +0.25 MiB）、target/release 多约 500 MB 缓存。
+[profile.release]
+incremental = true

@@ -1,0 +1,11 @@
+node_modules
+dist
+target
+.DS_Store
+release-artifacts
+.wrangler
+Makefile.local
+.claude/worktrees/
+.claude/settings.local.json
+.superpowers/
+.codegraph

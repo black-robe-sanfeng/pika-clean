@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "主窗口和菜单栏面板共用的权限",
+  "windows": ["main", "popover"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}

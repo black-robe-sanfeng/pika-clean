@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0.2" y2="1">
+      <stop stop-color="#fff"/><stop offset="0.65" stop-color="#fafbff"/><stop offset="1" stop-color="#e8eaf2"/>
+    </linearGradient>
+    <linearGradient id="handle" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#6039cb"/><stop offset="0.35" stop-color="#b79aff"/><stop offset="0.58" stop-color="#a283fa"/><stop offset="1" stop-color="#6742d6"/>
+    </linearGradient>
+    <linearGradient id="bristles" x1="0" y1="0" x2="0.9" y2="1">
+      <stop stop-color="#a5f2ff"/><stop offset="0.4" stop-color="#52bdff"/><stop offset="0.75" stop-color="#4b7ef0"/><stop offset="1" stop-color="#6254d6"/>
+    </linearGradient>
+    <linearGradient id="collar" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#c7aaff"/><stop offset="0.4" stop-color="#9572f1"/><stop offset="1" stop-color="#5c3cc3"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="0" y1="0" x2="0.7" y2="1">
+      <stop stop-color="#c4acff"/><stop offset="0.55" stop-color="#9c7af5"/><stop offset="1" stop-color="#6552d3"/>
+    </linearGradient>
+    <filter id="tileShadow" x="-15%" y="-15%" width="130%" height="135%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#1c2542" flood-opacity="0.18"/>
+    </filter>
+    <filter id="objectShadow" x="-40%" y="-30%" width="180%" height="180%">
+      <feDropShadow dx="9" dy="14" stdDeviation="10" flood-color="#40358c" flood-opacity="0.26"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#tile)" filter="url(#tileShadow)"/>
+  <rect x="104" y="104" width="816" height="816" rx="182" fill="none" stroke="#fff" stroke-width="5"/>
+  <g transform="rotate(34 512 512)" filter="url(#objectShadow)">
+    <rect x="465" y="235" width="94" height="342" rx="47" fill="url(#handle)"/>
+    <path d="M487 283v224" fill="none" stroke="#e4d8ff" stroke-opacity="0.65" stroke-width="9" stroke-linecap="round"/>
+    <path d="M433 544Q512 524 591 544L665 734Q675 767 641 776Q512 811 383 776Q349 767 359 734Z" fill="url(#bristles)"/>
+    <path d="M439 586l-37 149M488 588l-12 163M536 588l12 163M585 586l37 149" fill="none" stroke="#325bbb" stroke-opacity="0.32" stroke-width="12" stroke-linecap="round"/>
+    <path d="M451 589l-29 137M501 593l-4 147M550 591l17 141" fill="none" stroke="#d0f7ff" stroke-opacity="0.5" stroke-width="7" stroke-linecap="round"/>
+    <rect x="417" y="527" width="190" height="76" rx="30" fill="url(#collar)"/>
+    <path d="M444 544h132" fill="none" stroke="#e5d6ff" stroke-opacity="0.65" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <path d="M708 302Q720 362 780 374Q720 386 708 446Q696 386 636 374Q696 362 708 302Z" fill="url(#spark)" filter="url(#objectShadow)"/>
+  <path d="M735 524Q741 554 771 560Q741 566 735 596Q729 566 699 560Q729 554 735 524Z" fill="#65c9f3"/>
+</svg>

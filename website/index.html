@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pika Clean</title>
+<meta name="description" content="Pika Clean：仅支持 macOS 的 Mac 清理、卸载、优化与菜单栏监控，用 AI 解释每个文件能不能删。">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg1: #4a6cf0; --bg2: #2b2f93; --bg3: #191b5c;
+    --glass: rgba(255,255,255,.10); --glass-2: rgba(255,255,255,.16); --line: rgba(255,255,255,.18);
+    --text: #fff; --muted: rgba(255,255,255,.72); --dim: rgba(255,255,255,.5);
+    --accent: #b79aff; --ok: #4ade80; --cta: #fff; --cta-text: #2b2f93;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+  body {
+    margin: 0; color: var(--text); background: var(--bg3);
+    background-image: radial-gradient(1200px 700px at 15% -10%, var(--bg1), transparent 70%),
+                      radial-gradient(900px 600px at 100% 10%, #7a4fe0, transparent 65%),
+                      linear-gradient(180deg, var(--bg2), var(--bg3) 60%);
+    background-attachment: fixed;
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans", "Apple SD Gothic Neo", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: clip;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  .glass { background: var(--glass); border: 1px solid var(--line); border-radius: 20px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+  /* 顶栏 */
+  header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(25,27,92,.45); border-bottom: 1px solid rgba(255,255,255,.08); }
+  .nav { display: flex; align-items: center; gap: 24px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; text-decoration: none; }
+  .brand img { width: 32px; height: 32px; }
+  .links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; }
+  .links a { text-decoration: none; color: var(--muted); }
+  .links a:hover, .links a.on { color: var(--text); }
+  .links a.on { font-weight: 600; }
+  .page { display: none; }
+  .page.on { display: block; }
+  select { appearance: none; background: var(--glass-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 28px 6px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+  select option { color: #111; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; padding: 12px 26px; font-weight: 600; text-decoration: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; transition: transform .15s, box-shadow .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--cta); color: var(--cta-text); box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .btn-ghost { background: var(--glass-2); color: var(--text); border: 1px solid var(--line); }
+  .btn-sm { padding: 7px 16px; font-size: 14px; }
+  .btn[aria-disabled="true"] { opacity: .6; cursor: default; transform: none; }
+
+  /* 首屏 */
+  .hero { padding-top: 80px; padding-bottom: 40px; text-align: center; }
+  .pill { display: inline-block; padding: 6px 14px; border-radius: 999px; background: var(--glass-2); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  h1 { font-size: clamp(28px, 4vw, 44px); font-weight: 700; line-height: 1.2; margin: 22px auto 16px; max-width: 18em; letter-spacing: -.01em; }
+  .hero p.sub { max-width: 32em; margin: 0 auto 10px; color: rgba(255,255,255,.88); font-size: 18px; }
+  .hero h1, .hero p { text-wrap: balance; }
+  .hero p.feats { margin: 0 auto 32px; color: var(--dim); font-size: 14px; letter-spacing: .02em; }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .note { margin-top: 14px; font-size: 13px; color: var(--dim); }
+  .shot { position: relative; margin: 56px auto 0; max-width: 1000px; }
+  .shot .main { width: 100%; border-radius: 16px; border: 1px solid var(--line); box-shadow: 0 40px 80px rgba(0,0,0,.4); display: block; }
+  .shot img { height: auto; }
+  .shot .side { position: absolute; right: -12px; bottom: -40px; width: 24%; border-radius: 14px; box-shadow: 0 30px 60px rgba(0,0,0,.45); border: 1px solid rgba(0,0,0,.08); }
+
+  section { padding: 80px 0; }
+  h2 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; margin: 0 0 12px; text-align: center; letter-spacing: -.01em; }
+  .lead { text-align: center; color: var(--muted); max-width: 40em; margin: 0 auto 44px; }
+
+  /* 功能 */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { padding: 26px; }
+  .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; margin-bottom: 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  /* AI */
+  .ai { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+  .ai h2, .ai .lead { text-align: left; margin-left: 0; }
+  .ai ul { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 12px; }
+  .ai li { display: flex; gap: 12px; padding: 14px 16px; }
+  .ai li b { display: block; }
+  .ai li span { color: var(--muted); font-size: 14px; }
+  .ai .spark { color: var(--accent); font-size: 18px; line-height: 1.4; }
+  .ai img { width: 100%; height: auto; max-width: 420px; justify-self: center; border-radius: 18px; box-shadow: 0 30px 60px rgba(0,0,0,.4); }
+  .privacy { padding: 16px 18px; font-size: 14px; color: var(--muted); }
+
+  /* 对比 */
+  .table-wrap { overflow-x: auto; padding: 8px; }
+  table { width: 100%; border-collapse: collapse; min-width: 680px; }
+  th, td { padding: 16px 14px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.1); font-size: 15px; }
+  th:first-child, td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: 0; }
+  thead th { font-size: 14px; color: var(--muted); font-weight: 600; }
+  thead th.me { color: var(--text); font-size: 16px; }
+  td.me { background: rgba(255,255,255,.08); font-weight: 600; }
+  .y { color: var(--ok); font-weight: 700; } .n { color: var(--dim); } .p { color: #fbbf24; font-size: 13px; }
+
+  /* 价格 */
+  .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 340px)); gap: 20px; justify-content: center; }
+  .plan { padding: 32px; display: flex; flex-direction: column; }
+  .plan.pro { background: linear-gradient(160deg, rgba(183,154,255,.28), rgba(255,255,255,.08)); border-color: rgba(183,154,255,.6); position: relative; }
+  .plan h3 { margin: 0; font-size: 20px; }
+  .price { font-size: 44px; font-weight: 700; margin: 10px 0 0; letter-spacing: -.02em; }
+  .per { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .plan ul { list-style: none; padding: 0; margin: 0 0 28px; display: grid; gap: 10px; flex: 1; align-content: start; }
+  .plan li::before { content: "✓"; color: var(--ok); font-weight: 700; margin-right: 10px; }
+
+  /* 常见问题 */
+  .faq { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
+  details { padding: 18px 22px; }
+  summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--muted); font-size: 20px; line-height: 1; }
+  details[open] summary::after { content: "−"; }
+  details p { margin: 12px 0 0; color: var(--muted); }
+
+  .final { text-align: center; padding: 56px 24px; }
+  footer { padding: 32px 0 48px; color: var(--dim); font-size: 13px; text-align: center; }
+
+  @media (max-width: 860px) {
+    .nav { flex-wrap: wrap; height: auto; padding: 10px 20px; row-gap: 6px; }
+    .links { order: 3; width: 100%; margin: 0; overflow-x: auto; gap: 20px; white-space: nowrap; padding-bottom: 4px; }
+    .nav select { margin-left: auto; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .ai { grid-template-columns: 1fr; gap: 32px; }
+    .plans { grid-template-columns: 1fr; }
+    .shot .side { right: 8px; bottom: -28px; width: 30%; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    .nav { gap: 12px; }
+    .brand span { display: none; }
+    .grid { grid-template-columns: 1fr; }
+    .hero { padding-top: 48px; }
+    section { padding: 56px 0; }
+    .shot .side { display: none; }
+    table { min-width: 560px; }
+    th, td { padding: 12px 8px; font-size: 13px; }
+    td:first-child { min-width: 150px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#home"><img src="icon.svg" alt=""><span>Pika Clean</span></a>
+    <nav class="links">
+      <a href="#home" data-i18n="nav.home"></a>
+      <a href="#features" data-i18n="nav.features"></a>
+      <a href="#compare" data-i18n="nav.compare"></a>
+      <a href="#pricing" data-i18n="nav.pricing"></a>
+      <a href="#faq" data-i18n="nav.faq"></a>
+      <a class="gh" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <select id="lang" aria-label="Language">
+      <option value="zh">简体中文</option>
+      <option value="zh-Hant">繁體中文</option>
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+      <option value="ko">한국어</option>
+    </select>
+    <a class="btn btn-primary btn-sm dl" data-i18n="nav.download"></a>
+  </div>
+</header>
+
+<main>
+  <div class="page" data-page="home">
+  <div class="wrap hero">
+    <span class="pill" data-i18n="hero.tag"></span>
+    <h1 data-i18n="hero.title"></h1>
+    <p class="sub" data-i18n="hero.sub"></p>
+    <p class="feats" data-i18n="hero.feats"></p>
+    <div class="ctas">
+      <a class="btn btn-primary dl" data-i18n="hero.cta"></a>
+      <a class="btn btn-ghost gh" target="_blank" rel="noopener" data-i18n="hero.gh"></a>
+    </div>
+    <div class="note" data-i18n="hero.note"></div>
+    <div class="shot">
+      <img class="main" src="main.jpg" width="1200" height="780" alt="Pika Clean">
+      <img class="side" src="menubar.jpg" width="520" height="648" alt="">
+    </div>
+  </div>
+  </div>
+
+  <div class="page" data-page="features">
+  <section>
+    <div class="wrap">
+      <h2 data-i18n="f.title"></h2>
+      <p class="lead" data-i18n="f.lead"></p>
+      <div class="grid">
+        <div class="card glass"><div class="ico" style="background:#3b82f6">✦</div><h3 data-i18n="f1.t"></h3><p data-i18n="f1.d"></p></div>
+        <div class="card glass"><div class="ico" style="background:#f59e0b">⊗</div><h3 data-i18n="f2.t"></h3><p data-i18n="f2.d"></p></div>
+        <div class="card glass"><div class="ico" style="background:#a855f7">ϟ</div><h3 data-i18n="f3.t"></h3><p data-i18n="f3.d"></p></div>
+        <div class="card glass"><div class="ico" style="background:#10b981">◔</div><h3 data-i18n="f4.t"></h3><p data-i18n="f4.d"></p></div>
+        <div class="card glass"><div class="ico" style="background:#6366f1">⌘</div><h3 data-i18n="f5.t"></h3><p data-i18n="f5.d"></p></div>
+        <div class="card glass"><div class="ico" style="background:#ec4899">◫</div><h3 data-i18n="f6.t"></h3><p data-i18n="f6.d"></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap ai">
+      <div>
+        <h2 data-i18n="ai.title"></h2>
+        <p class="lead" data-i18n="ai.lead"></p>
+        <ul>
+          <li class="glass"><span class="spark">✦</span><div><b data-i18n="ai1.t"></b><span data-i18n="ai1.d"></span></div></li>
+          <li class="glass"><span class="spark">✦</span><div><b data-i18n="ai2.t"></b><span data-i18n="ai2.d"></span></div></li>
+          <li class="glass"><span class="spark">✦</span><div><b data-i18n="ai3.t"></b><span data-i18n="ai3.d"></span></div></li>
+          <li class="glass"><span class="spark">✦</span><div><b data-i18n="ai4.t"></b><span data-i18n="ai4.d"></span></div></li>
+        </ul>
+        <div class="privacy glass" data-i18n="ai.privacy"></div>
+      </div>
+      <img src="ai.jpg" width="320" height="541" alt="" loading="lazy">
+    </div>
+  </section>
+  </div>
+
+  <div class="page" data-page="compare">
+  <section>
+    <div class="wrap">
+      <h2 data-i18n="c.title"></h2>
+      <p class="lead" data-i18n="c.lead"></p>
+      <div class="table-wrap glass">
+        <table>
+          <thead><tr><th></th><th class="me">Pika Clean</th><th data-i18n="c.sub"></th><th data-i18n="c.free"></th><th data-i18n="c.os"></th></tr></thead>
+          <tbody>
+            <tr><td data-i18n="c.r1"></td><td class="me y">✓</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td></tr>
+            <tr><td data-i18n="c.r2"></td><td class="me y">✓</td><td class="y">✓</td><td class="n">✗</td><td class="p" data-i18n="c.part"></td></tr>
+            <tr><td data-i18n="c.r3"></td><td class="me y">✓</td><td class="y">✓</td><td class="p" data-i18n="c.part"></td><td class="n">✗</td></tr>
+            <tr><td data-i18n="c.r4"></td><td class="me y">✓</td><td class="p" data-i18n="c.part"></td><td class="p" data-i18n="c.part"></td><td class="n">✗</td></tr>
+            <tr><td data-i18n="c.r5"></td><td class="me y">✓</td><td class="p" data-i18n="c.part"></td><td class="p" data-i18n="c.part"></td><td class="y">✓</td></tr>
+            <tr><td data-i18n="c.r7"></td><td class="me y">✓</td><td class="n">✗</td><td class="p" data-i18n="c.part"></td><td class="n">✗</td></tr>
+            <tr><td data-i18n="c.r6"></td><td class="me" data-i18n="c.p1"></td><td data-i18n="c.p2"></td><td data-i18n="c.p3"></td><td data-i18n="c.p3"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div class="page" data-page="pricing">
+  <section>
+    <div class="wrap">
+      <h2 data-i18n="p.title"></h2>
+      <p class="lead" data-i18n="p.lead"></p>
+      <div class="plans">
+        <div class="plan glass pro">
+          <h3 data-i18n="p.free"></h3>
+          <div class="price" data-i18n="p.freePrice"></div>
+          <div class="per" data-i18n="p.freePer"></div>
+          <ul><li data-i18n="p.f1"></li><li data-i18n="p.f2"></li><li data-i18n="p.f3"></li><li data-i18n="p.f4"></li></ul>
+          <a class="btn btn-primary dl" data-i18n="hero.cta"></a>
+        </div>
+        <div class="plan glass">
+          <h3 data-i18n="p.ai"></h3>
+          <div class="price" data-i18n="p.aiPrice"></div>
+          <div class="per" data-i18n="p.aiPer"></div>
+          <ul><li data-i18n="p.a1"></li><li data-i18n="p.a2"></li><li data-i18n="p.a3"></li></ul>
+          <a class="btn btn-ghost gh" target="_blank" rel="noopener" data-i18n="p.aiBtn"></a>
+        </div>
+        <div class="plan glass">
+          <h3 data-i18n="p.sup"></h3>
+          <div class="price" data-i18n="p.supPrice"></div>
+          <div class="per" data-i18n="p.supPer"></div>
+          <ul><li data-i18n="p.s1"></li><li data-i18n="p.s2"></li></ul>
+          <a class="btn btn-ghost sponsor" target="_blank" rel="noopener" data-i18n="p.supBtn"></a>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div class="page" data-page="faq">
+  <section>
+    <div class="wrap">
+      <h2 data-i18n="q.title"></h2>
+      <p class="lead"></p>
+      <div class="faq">
+        <details class="glass" open><summary data-i18n="q6.q"></summary><p data-i18n="q6.a"></p></details>
+        <details class="glass"><summary data-i18n="q1.q"></summary><p data-i18n="q1.a"></p></details>
+        <details class="glass"><summary data-i18n="q2.q"></summary><p data-i18n="q2.a"></p></details>
+        <details class="glass"><summary data-i18n="q3.q"></summary><p data-i18n="q3.a"></p></details>
+        <details class="glass"><summary data-i18n="q4.q"></summary><p data-i18n="q4.a"></p></details>
+        <details class="glass"><summary data-i18n="q5.q"></summary><p data-i18n="q5.a"></p></details>
+        <details class="glass"><summary data-i18n="q7.q"></summary><p data-i18n="q7.a"></p></details>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="final glass">
+        <h2 data-i18n="end.title"></h2>
+        <p class="lead" data-i18n="end.lead"></p>
+        <a class="btn btn-primary dl" data-i18n="hero.cta"></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">© 2026 Pika Clean · <span data-i18n="foot"></span></div></footer>
+
+<script>
+// 版本号由 scripts/release.sh 发布时自动改成刚发布的版本（R2 上的安装包文件名带版本号）
+const VERSION = '0.1.2';
+const DMG = `https://dl.daoly.top/pikaclean-${VERSION}-aarch64.dmg`;
+const REPO = 'https://github.com/black-robe-sanfeng/pika-clean';
+const SPONSOR = 'https://afdian.com/a/black-robe-sanfeng';
+
+const T = {
+  zh: {
+    'q6.a': '没有。Pika Clean 只为 macOS 打造，用到了菜单栏、废纸篓、钥匙串等 Mac 专有的能力，目前没有 Windows 和 Linux 版本。',
+    'q6.q': '有 Windows 版吗？',
+    'nav.home': '首页',
+    'meta.title': 'Pika Clean · 看得懂的 Mac 清理工具',
+    'nav.features': '功能', 'nav.compare': '对比', 'nav.pricing': '价格', 'nav.faq': '常见问题', 'nav.download': '下载 Mac 版',
+    'hero.tag': '开源免费 · 专为 macOS 打造 · AI 解释',
+    'hero.title': '删之前，先弄明白每一个文件',
+    'hero.sub': '拿不准的文件，点一下，AI 告诉你它是什么、能不能删。',
+    'hero.feats': '清理空间 · 卸载软件 · 优化速度 · 菜单栏实时监控',
+    'hero.cta': '免费下载 Mac 版',
+    'hero.note': '仅支持 macOS（Apple 芯片）· 暂无 Windows 版 · 版本 {v} · 无需注册账号',
+    'f.title': '一个应用，管好整台 Mac',
+    'f.lead': '常用的清理和维护功能都在这里，界面原生、操作简单。',
+    'f1.t': '智能扫描与清理', 'f1.d': '一键找出缓存、日志、废纸篓、旧下载和崩溃转储。缓存直接删除，个人文件只移到废纸篓。',
+    'f2.t': '卸载软件', 'f2.d': '连同偏好设置、缓存和支持文件一起删除，不留残渣。',
+    'f3.t': '优化速度', 'f3.d': '释放内存、管理开机启动项、结束占资源的进程、运行系统维护任务。',
+    'f4.t': '菜单栏监控', 'f4.d': 'CPU、GPU、内存、磁盘、网络、电池、温度和风扇转速，点一下菜单栏图标就能看到。',
+    'f5.t': '开发者深度清理', 'f5.d': 'Xcode、模拟器、Docker、包管理器缓存，以及 Claude、Cursor 等 AI 工具的缓存和旧对话。',
+    'f6.t': '空间去向', 'f6.d': '统计整个启动盘，看清大文件都在哪，不需要的个人文件可以直接移到废纸篓。',
+    'ai.title': '看不懂的文件，问 AI',
+    'ai.lead': '普通清理软件只告诉你「这个文件夹有 2 GB」。Pika Clean 会告诉你它是谁留下的、删了会怎样、现在适不适合删。',
+    'ai1.t': '逐条解释', 'ai1.d': '每个缓存、每个进程，点一下就知道它是什么。',
+    'ai2.t': '一句话清理', 'ai2.d': '说「帮我腾出空间，别动下载的文件」，AI 替你勾选。',
+    'ai3.t': '变慢诊断', 'ai3.d': '问一句「为什么我的 Mac 变慢了」，结合当前占用给出原因和建议。',
+    'ai4.t': '卸载提醒与整理下载', 'ai4.d': '卸载前提醒会丢掉什么；把下载文件夹按用途分好组。',
+    'ai.privacy': '🔒 AI 通过你本机已登录的 Claude Code 调用，也可以填自己的 API Key。发给 AI 的只有路径、大小和类别，从不读取或上传文件内容。AI 只给建议，任何删除都要你确认。',
+    'c.title': '和同类产品比一比', 'c.lead': '不用订阅，也不用装好几个小工具。',
+    'c.sub': '订阅制清理软件', 'c.free': '免费单项工具', 'c.os': 'macOS 自带',
+    'c.part': '部分',
+    'c.r1': '用 AI 解释文件是什么、删了会怎样',
+    'c.r2': '清理、卸载、优化集中在一个应用',
+    'c.r3': '菜单栏实时监控（含温度、风扇）',
+    'c.r4': '开发工具与 AI 工具缓存清理',
+    'c.r5': '无需注册账号，数据只留在本机',
+    'c.r6': '价格',
+    'c.p1': '开源免费', 'c.p2': '按年订阅', 'c.p3': '免费',
+    'p.title': '全部功能免费', 'p.lead': '代码以 GPLv3 开源。以后可能推出可选的付费服务，现有功能会一直免费。',
+    'p.free': '免费版', 'p.freePrice': '¥0', 'p.freePer': '开源，永久免费',
+    'p.f1': '清理、卸载、优化、菜单栏监控', 'p.f2': '开发者深度清理与空间去向', 'p.f3': '全部 AI 功能（用你自己的 Claude Code 或 API Key）', 'p.f4': '自动更新',
+    'p.supBtn': '去爱发电赞助',
+    'q.title': '常见问题',
+    'q1.q': '打开时提示「无法验证开发者」怎么办？',
+    'q1.a': '应用目前还没有苹果开发者签名。第一次打开被拦截后，到「系统设置 → 隐私与安全性」，在页面底部点「仍要打开」，再输入一次登录密码即可，以后不会再提示。如果提示「已损坏，应移到废纸篓」，先把应用拖进「应用程序」文件夹，再打开「终端」执行 xattr -cr "/Applications/Pika Clean.app"，然后重新打开。',
+    'q2.q': '会不会误删重要文件？',
+    'q2.a': '只有能重新生成的缓存和日志会直接删除；个人文件和应用一律移到废纸篓，清空之前随时可以恢复。旧下载这类个人文件默认不勾选。',
+    'q3.q': 'AI 会上传我的文件吗？',
+    'q3.a': '不会。AI 只在你点击时调用，发送的只有路径（不含用户名）、大小、类别和多久没用，不读取任何文件内容。第一次使用前会先征得你的同意。',
+    'q4.q': '支持哪些 Mac？',
+    'q4.a': '目前支持 Apple 芯片（M 系列）的 Mac。',
+    'q5.q': '怎么更新？',
+    'q5.a': '应用启动时会自动检查新版本，有更新会弹窗提示，一键完成。',
+    'end.title': '让你的 Mac 清爽起来', 'end.lead': '免费下载，几秒钟完成第一次扫描。',
+    'foot': '仅适用于 macOS · 暂无 Windows 版 · 以 GPLv3 开源',
+    'hero.gh': '在 GitHub 查看源码',
+    'c.r7': '开源，代码公开可查',
+    'p.ai': 'AI 额度',
+    'p.aiPrice': '即将推出',
+    'p.aiPer': '可选的按月订阅',
+    'p.a1': '不用自己申请和配置 API Key',
+    'p.a2': '装好就能用全部 AI 功能',
+    'p.a3': '收入用来支持项目继续开发',
+    'p.aiBtn': '在 GitHub 关注进展',
+    'p.sup': '支持者',
+    'p.supPrice': '随心意',
+    'p.supPer': '自愿赞助',
+    'p.s1': '帮项目一直做下去',
+    'p.s2': '不解锁任何功能，纯粹支持',
+    'q7.q': '为什么开源？以后会收费吗？',
+    'q7.a': '清理软件要删你的文件，代码公开，谁都能检查它到底做了什么。现在全部功能免费。以后可能推出可选的付费服务，比如不用自己配 Key 的 AI 额度；已有的功能不会改成收费。',
+  },
+  'zh-Hant': {
+    'q6.a': '沒有。Pika Clean 只為 macOS 打造，用到了選單列、垃圾桶、鑰匙圈等 Mac 專有的功能，目前沒有 Windows 和 Linux 版本。',
+    'q6.q': '有 Windows 版嗎？',
+    'nav.home': '首頁',
+    'meta.title': 'Pika Clean · 看得懂的 Mac 清理工具',
+    'nav.features': '功能', 'nav.compare': '比較', 'nav.pricing': '價格', 'nav.faq': '常見問題', 'nav.download': '下載 Mac 版',
+    'hero.tag': '開源免費 · 專為 macOS 打造 · AI 解釋',
+    'hero.title': '刪除之前，先弄懂每一個檔案',
+    'hero.sub': '拿不準的檔案，點一下，AI 告訴你它是什麼、能不能刪。',
+    'hero.feats': '清理空間 · 解除安裝軟體 · 最佳化速度 · 選單列即時監控',
+    'hero.cta': '免費下載 Mac 版',
+    'hero.note': '僅支援 macOS（Apple 晶片）· 暫無 Windows 版 · 版本 {v} · 無需註冊帳號',
+    'f.title': '一個 App，管好整台 Mac',
+    'f.lead': '常用的清理和維護功能都在這裡，介面原生、操作簡單。',
+    'f1.t': '智慧掃描與清理', 'f1.d': '一鍵找出快取、日誌、垃圾桶、舊下載和當機傾印。快取直接刪除，個人檔案只移到垃圾桶。',
+    'f2.t': '解除安裝軟體', 'f2.d': '連同偏好設定、快取和支援檔案一起刪除，不留殘渣。',
+    'f3.t': '最佳化速度', 'f3.d': '釋放記憶體、管理登入項目、結束佔用資源的程序、執行系統維護工作。',
+    'f4.t': '選單列監控', 'f4.d': 'CPU、GPU、記憶體、磁碟、網路、電池、溫度和風扇轉速，點一下選單列圖示就能看到。',
+    'f5.t': '開發者深度清理', 'f5.d': 'Xcode、模擬器、Docker、套件管理器快取，以及 Claude、Cursor 等 AI 工具的快取和舊對話。',
+    'f6.t': '空間去向', 'f6.d': '統計整個啟動磁碟，看清大檔案都在哪，不需要的個人檔案可以直接移到垃圾桶。',
+    'ai.title': '看不懂的檔案，問 AI',
+    'ai.lead': '一般清理軟體只告訴你「這個資料夾有 2 GB」。Pika Clean 會告訴你它是誰留下的、刪了會怎樣、現在適不適合刪。',
+    'ai1.t': '逐項解釋', 'ai1.d': '每個快取、每個程序，點一下就知道它是什麼。',
+    'ai2.t': '一句話清理', 'ai2.d': '說「幫我騰出空間，別動下載的檔案」，AI 替你勾選。',
+    'ai3.t': '變慢診斷', 'ai3.d': '問一句「為什麼我的 Mac 變慢了」，根據目前佔用給出原因和建議。',
+    'ai4.t': '解除安裝提醒與整理下載', 'ai4.d': '解除安裝前提醒會失去什麼；把下載資料夾按用途分好組。',
+    'ai.privacy': '🔒 AI 透過你本機已登入的 Claude Code 呼叫，也可以填自己的 API Key。傳給 AI 的只有路徑、大小和類別，從不讀取或上傳檔案內容。AI 只給建議，任何刪除都要你確認。',
+    'c.title': '和同類產品比一比', 'c.lead': '不用訂閱，也不用裝好幾個小工具。',
+    'c.sub': '訂閱制清理軟體', 'c.free': '免費單項工具', 'c.os': 'macOS 內建',
+    'c.part': '部分',
+    'c.r1': '用 AI 解釋檔案是什麼、刪了會怎樣',
+    'c.r2': '清理、解除安裝、最佳化集中在一個 App',
+    'c.r3': '選單列即時監控（含溫度、風扇）',
+    'c.r4': '開發工具與 AI 工具快取清理',
+    'c.r5': '無需註冊帳號，資料只留在本機',
+    'c.r6': '價格',
+    'c.p1': '開源免費', 'c.p2': '按年訂閱', 'c.p3': '免費',
+    'p.title': '全部功能免費', 'p.lead': '程式碼以 GPLv3 開源。之後可能推出可選的付費服務，現有功能會一直免費。',
+    'p.free': '免費版', 'p.freePrice': '$0', 'p.freePer': '開源，永久免費',
+    'p.f1': '清理、解除安裝、最佳化、選單列監控', 'p.f2': '開發者深度清理與空間去向', 'p.f3': '全部 AI 功能（用你自己的 Claude Code 或 API Key）', 'p.f4': '自動更新',
+    'p.supBtn': '前往愛發電贊助',
+    'q.title': '常見問題',
+    'q1.q': '開啟時提示「無法驗證開發者」怎麼辦？',
+    'q1.a': 'App 目前還沒有 Apple 開發者簽署。第一次開啟被阻擋後，到「系統設定 → 隱私權與安全性」，在頁面底部點「強制打開」，再輸入一次登入密碼即可，之後不會再提示。如果提示「已損毀，應該丟到垃圾桶」，先把 App 拖進「應用程式」檔案夾，再打開「終端機」執行 xattr -cr "/Applications/Pika Clean.app"，然後重新開啟。',
+    'q2.q': '會不會誤刪重要檔案？',
+    'q2.a': '只有能重新產生的快取和日誌會直接刪除；個人檔案和 App 一律移到垃圾桶，清空之前隨時可以復原。舊下載這類個人檔案預設不勾選。',
+    'q3.q': 'AI 會上傳我的檔案嗎？',
+    'q3.a': '不會。AI 只在你點擊時呼叫，傳送的只有路徑（不含使用者名稱）、大小、類別和多久沒用，不讀取任何檔案內容。第一次使用前會先徵得你的同意。',
+    'q4.q': '支援哪些 Mac？',
+    'q4.a': '目前支援 Apple 晶片（M 系列）的 Mac。',
+    'q5.q': '怎麼更新？',
+    'q5.a': 'App 啟動時會自動檢查新版本，有更新會跳出提示，一鍵完成。',
+    'end.title': '讓你的 Mac 清爽起來', 'end.lead': '免費下載，幾秒鐘完成第一次掃描。',
+    'foot': '僅適用於 macOS · 暫無 Windows 版 · 以 GPLv3 開源',
+    'hero.gh': '在 GitHub 查看原始碼',
+    'c.r7': '開源，程式碼公開可查',
+    'p.ai': 'AI 額度',
+    'p.aiPrice': '即將推出',
+    'p.aiPer': '可選的按月訂閱',
+    'p.a1': '不用自己申請和設定 API Key',
+    'p.a2': '裝好就能用全部 AI 功能',
+    'p.a3': '收入用來支持專案繼續開發',
+    'p.aiBtn': '在 GitHub 關注進度',
+    'p.sup': '支持者',
+    'p.supPrice': '隨心意',
+    'p.supPer': '自願贊助',
+    'p.s1': '幫專案一直做下去',
+    'p.s2': '不解鎖任何功能，純粹支持',
+    'q7.q': '為什麼開源？之後會收費嗎？',
+    'q7.a': '清理軟體要刪你的檔案，程式碼公開，誰都能檢查它到底做了什麼。現在全部功能免費。之後可能推出可選的付費服務，例如不用自己設定 Key 的 AI 額度；已有的功能不會改成收費。',
+  },
+  en: {
+    'q6.a': 'No. Pika Clean is built only for macOS and relies on Mac-specific features like the menu bar, Trash and Keychain. There are currently no Windows or Linux versions.',
+    'q6.q': 'Is there a Windows version?',
+    'nav.home': 'Home',
+    'meta.title': 'Pika Clean · The Mac cleaner that explains itself',
+    'nav.features': 'Features', 'nav.compare': 'Compare', 'nav.pricing': 'Pricing', 'nav.faq': 'FAQ', 'nav.download': 'Download for Mac',
+    'hero.tag': 'Free & open source · Made for macOS · AI explanations',
+    'hero.title': 'Know what every file is before you delete it',
+    'hero.sub': 'Not sure about a file? One click and AI tells you what it is and whether it’s safe to delete.',
+    'hero.feats': 'Free up space · Uninstall apps · Speed up · Live menu bar stats',
+    'hero.cta': 'Download free for Mac',
+    'hero.note': 'macOS only (Apple silicon) · No Windows version · Version {v} · No account needed',
+    'f.title': 'One app to keep your whole Mac in shape',
+    'f.lead': 'All the everyday cleanup and maintenance tools, with a native look and simple controls.',
+    'f1.t': 'Smart scan & cleanup', 'f1.d': 'Find caches, logs, Trash, old downloads and crash dumps in one click. Caches are deleted; personal files only go to the Trash.',
+    'f2.t': 'Uninstaller', 'f2.d': 'Removes apps together with their preferences, caches and support files. Nothing left behind.',
+    'f3.t': 'Speed up', 'f3.d': 'Free up memory, manage login items, quit heavy processes and run maintenance tasks.',
+    'f4.t': 'Menu bar monitor', 'f4.d': 'CPU, GPU, memory, disk, network, battery, temperature and fan speed, one click away.',
+    'f5.t': 'Developer deep clean', 'f5.d': 'Xcode, simulators, Docker, package manager caches, plus caches and old chats from AI tools like Claude and Cursor.',
+    'f6.t': 'Space map', 'f6.d': 'See where every gigabyte on your startup disk goes, and move personal files you don’t need to the Trash.',
+    'ai.title': 'Don’t know what it is? Ask AI',
+    'ai.lead': 'Most cleaners just say “this folder is 2 GB”. Pika Clean tells you what created it, what happens if you delete it, and whether now is a good time.',
+    'ai1.t': 'Item-by-item explanations', 'ai1.d': 'Click any cache or process to learn what it is.',
+    'ai2.t': 'Clean with one sentence', 'ai2.d': 'Say “free up space but don’t touch my downloads” and AI picks the categories.',
+    'ai3.t': 'Slowdown diagnosis', 'ai3.d': 'Ask “why is my Mac slow?” and get causes and fixes based on current usage.',
+    'ai4.t': 'Uninstall warnings & download sorting', 'ai4.d': 'Learn what you’ll lose before uninstalling; group your Downloads folder by purpose.',
+    'ai.privacy': '🔒 AI runs through the Claude Code you’re already signed in to, or your own API key. Only paths, sizes and categories are sent — file contents are never read or uploaded. AI only suggests; every deletion needs your confirmation.',
+    'c.title': 'How it compares', 'c.lead': 'No subscription, and no need for a pile of single-purpose tools.',
+    'c.sub': 'Subscription cleaners', 'c.free': 'Free single-purpose tools', 'c.os': 'Built into macOS',
+    'c.part': 'Partial',
+    'c.r1': 'AI explains what a file is and what deleting it does',
+    'c.r2': 'Cleanup, uninstall and optimization in one app',
+    'c.r3': 'Live menu bar monitor (incl. temperature, fans)',
+    'c.r4': 'Developer & AI tool cache cleanup',
+    'c.r5': 'No account, data stays on your Mac',
+    'c.r6': 'Price',
+    'c.p1': 'Free & open source', 'c.p2': 'Yearly subscription', 'c.p3': 'Free',
+    'p.title': 'Every feature is free', 'p.lead': 'The code is open source under GPLv3. Optional paid services may come later; existing features will stay free.',
+    'p.free': 'Free', 'p.freePrice': '$0', 'p.freePer': 'Open source, free forever',
+    'p.f1': 'Clean, uninstall, speed up, menu bar monitor', 'p.f2': 'Developer deep clean and space map', 'p.f3': 'All AI features, using your own Claude Code or API key', 'p.f4': 'Automatic updates',
+    'p.supBtn': 'Sponsor on Afdian',
+    'q.title': 'FAQ',
+    'q1.q': 'macOS says the developer can’t be verified. What do I do?',
+    'q1.a': 'The app isn’t signed with an Apple Developer ID yet. After the first blocked launch, open System Settings → Privacy & Security and click “Open Anyway” at the bottom, then enter your login password. You’ll only need to do this once. If macOS says the app “is damaged and should be moved to the Trash”, drag it into Applications, open Terminal, run xattr -cr "/Applications/Pika Clean.app", then open it again.',
+    'q2.q': 'Could it delete something important?',
+    'q2.a': 'Only regenerable caches and logs are deleted directly. Personal files and apps always go to the Trash, so you can restore them until you empty it. Personal files like old downloads are unchecked by default.',
+    'q3.q': 'Does AI upload my files?',
+    'q3.a': 'No. AI runs only when you click, and it receives only paths (without your username), sizes, categories and last-used dates. File contents are never read. You’re asked for consent before first use.',
+    'q4.q': 'Which Macs are supported?',
+    'q4.a': 'Macs with Apple silicon (M-series chips).',
+    'q5.q': 'How do updates work?',
+    'q5.a': 'The app checks for new versions on launch and offers a one-click update.',
+    'end.title': 'Give your Mac a fresh start', 'end.lead': 'Download for free and finish your first scan in seconds.',
+    'foot': 'For macOS only · No Windows version · Open source under GPLv3',
+    'hero.gh': 'View source on GitHub',
+    'c.r7': 'Open source, anyone can audit the code',
+    'p.ai': 'AI credits',
+    'p.aiPrice': 'Coming soon',
+    'p.aiPer': 'Optional monthly plan',
+    'p.a1': 'No API key to get or set up',
+    'p.a2': 'Every AI feature works right after install',
+    'p.a3': 'Helps fund ongoing development',
+    'p.aiBtn': 'Follow on GitHub',
+    'p.sup': 'Supporter',
+    'p.supPrice': 'Any amount',
+    'p.supPer': 'Voluntary sponsorship',
+    'p.s1': 'Keeps the project going',
+    'p.s2': 'Unlocks nothing, just support',
+    'q7.q': 'Why open source? Will it cost money later?',
+    'q7.a': 'A cleaner deletes your files, so its code should be open for anyone to check. Every feature is free today. Optional paid services may come later, such as AI credits that need no API key of your own, but existing features will never become paid.',
+  },
+  ja: {
+    'q6.a': 'ありません。Pika Clean は macOS 専用で、メニューバー、ゴミ箱、キーチェーンなど Mac 固有の機能を使っています。現在、Windows 版と Linux 版はありません。',
+    'q6.q': 'Windows 版はありますか？',
+    'nav.home': 'ホーム',
+    'meta.title': 'Pika Clean · 中身がわかる Mac クリーナー',
+    'nav.features': '機能', 'nav.compare': '比較', 'nav.pricing': '価格', 'nav.faq': 'よくある質問', 'nav.download': 'Mac 版をダウンロード',
+    'hero.tag': '無料・オープンソース · macOS 専用 · AI 解説',
+    'hero.title': '消す前に、そのファイルが何かを知る',
+    'hero.sub': '迷うファイルはクリックするだけ。AI が正体と削除してよいかを教えてくれます。',
+    'hero.feats': '空き容量の確保 · アプリの削除 · 高速化 · メニューバーで常時監視',
+    'hero.cta': 'Mac 版を無料ダウンロード',
+    'hero.note': 'macOS 専用（Apple シリコン）· Windows 版はありません · バージョン {v} · アカウント登録不要',
+    'f.title': 'ひとつのアプリで Mac 全体をケア',
+    'f.lead': '日常的なクリーンアップとメンテナンスをネイティブな操作感で。',
+    'f1.t': 'スマートスキャンと削除', 'f1.d': 'キャッシュ、ログ、ゴミ箱、古いダウンロード、クラッシュダンプをワンクリックで検出。キャッシュは直接削除、個人ファイルはゴミ箱へ移すだけ。',
+    'f2.t': 'アンインストーラ', 'f2.d': '環境設定、キャッシュ、サポートファイルまでまとめて削除。残骸を残しません。',
+    'f3.t': '高速化', 'f3.d': 'メモリ解放、ログイン項目の管理、重いプロセスの終了、メンテナンスの実行。',
+    'f4.t': 'メニューバー監視', 'f4.d': 'CPU、GPU、メモリ、ディスク、ネットワーク、バッテリー、温度、ファン回転数をワンクリックで。',
+    'f5.t': '開発者向けディープクリーン', 'f5.d': 'Xcode、シミュレータ、Docker、パッケージマネージャのキャッシュ、Claude や Cursor など AI ツールのキャッシュと古い会話。',
+    'f6.t': '容量の行き先', 'f6.d': '起動ディスク全体を集計し、大きなファイルの場所を可視化。不要な個人ファイルはそのままゴミ箱へ。',
+    'ai.title': 'わからないファイルは AI に聞く',
+    'ai.lead': '一般的なクリーナーは「このフォルダは 2 GB」と言うだけ。Pika Clean は、誰が作ったのか、消すとどうなるのか、今消してよいのかを教えます。',
+    'ai1.t': '項目ごとの解説', 'ai1.d': 'キャッシュやプロセスをクリックすれば正体がわかります。',
+    'ai2.t': 'ひと言でクリーンアップ', 'ai2.d': '「容量を空けて、ダウンロードは触らないで」と言えば AI が選びます。',
+    'ai3.t': '遅くなった原因の診断', 'ai3.d': '「なぜ Mac が遅い？」と聞けば、現在の使用状況から原因と対策を提示。',
+    'ai4.t': '削除前の注意とダウンロード整理', 'ai4.d': 'アンインストールで失うものを事前に確認。ダウンロードフォルダを用途別に整理。',
+    'ai.privacy': '🔒 AI はログイン済みの Claude Code、またはご自身の API キーで動作します。送信するのはパス・サイズ・カテゴリだけで、ファイルの中身は読み取りも送信もしません。AI は提案のみで、削除には必ずあなたの確認が必要です。',
+    'c.title': '他の製品との比較', 'c.lead': 'サブスク不要、ツールをいくつも入れる必要もありません。',
+    'c.sub': 'サブスク型クリーナー', 'c.free': '無料の単機能ツール', 'c.os': 'macOS 標準',
+    'c.part': '一部',
+    'c.r1': 'ファイルの正体と削除の影響を AI が解説',
+    'c.r2': 'クリーンアップ・削除・高速化をひとつのアプリで',
+    'c.r3': 'メニューバーでのリアルタイム監視（温度・ファン含む）',
+    'c.r4': '開発ツールと AI ツールのキャッシュ削除',
+    'c.r5': 'アカウント不要、データは Mac の中だけ',
+    'c.r6': '価格',
+    'c.p1': '無料・オープンソース', 'c.p2': '年額サブスク', 'c.p3': '無料',
+    'p.title': 'すべての機能が無料', 'p.lead': 'コードは GPLv3 で公開しています。今後オプションの有料サービスを出す可能性はありますが、今ある機能はずっと無料です。',
+    'p.free': '無料版', 'p.freePrice': '$0', 'p.freePer': 'オープンソース、ずっと無料',
+    'p.f1': 'クリーンアップ・アンインストール・高速化・メニューバー監視', 'p.f2': '開発者向けディープクリーンと容量の行き先', 'p.f3': 'すべての AI 機能（自分の Claude Code または API キーで）', 'p.f4': '自動アップデート',
+    'p.supBtn': 'Afdian で支援する',
+    'q.title': 'よくある質問',
+    'q1.q': '「開発元を検証できません」と表示されたら？',
+    'q1.a': 'アプリはまだ Apple の Developer ID で署名されていません。最初にブロックされた後、「システム設定 → プライバシーとセキュリティ」を開き、下部の「このまま開く」をクリックし、ログインパスワードを入力してください。次回からは表示されません。「壊れているため開けません」と表示された場合は、アプリを「アプリケーション」フォルダに移してから「ターミナル」で xattr -cr "/Applications/Pika Clean.app" を実行し、もう一度開いてください。',
+    'q2.q': '大事なファイルを消してしまわない？',
+    'q2.a': '直接削除するのは再生成できるキャッシュとログだけです。個人ファイルとアプリは必ずゴミ箱へ移すので、空にするまではいつでも戻せます。古いダウンロードなどの個人ファイルは初期状態で未選択です。',
+    'q3.q': 'AI にファイルがアップロードされる？',
+    'q3.a': 'いいえ。AI はクリックしたときだけ動き、送るのはパス（ユーザー名は除く）、サイズ、カテゴリ、最終使用日だけです。ファイルの中身は読みません。初回利用時には同意を求めます。',
+    'q4.q': '対応している Mac は？',
+    'q4.a': 'Apple シリコン（M シリーズ）搭載の Mac に対応しています。',
+    'q5.q': 'アップデートは？',
+    'q5.a': '起動時に新しいバージョンを自動確認し、ワンクリックで更新できます。',
+    'end.title': 'Mac をすっきりさせよう', 'end.lead': '無料でダウンロードして、数秒で最初のスキャンを。',
+    'foot': 'macOS 専用 · Windows 版なし · GPLv3 オープンソース',
+    'hero.gh': 'GitHub でソースを見る',
+    'c.r7': 'オープンソースで誰でもコードを確認できる',
+    'p.ai': 'AI クレジット',
+    'p.aiPrice': '近日公開',
+    'p.aiPer': '任意の月額プラン',
+    'p.a1': 'API キーの取得・設定が不要',
+    'p.a2': 'インストールしてすぐ AI 機能が使える',
+    'p.a3': '収益は開発の継続に使われます',
+    'p.aiBtn': 'GitHub で進捗を見る',
+    'p.sup': 'サポーター',
+    'p.supPrice': '金額自由',
+    'p.supPer': '任意の支援',
+    'p.s1': 'プロジェクトの継続を支える',
+    'p.s2': '機能の解放はなし、純粋な応援です',
+    'q7.q': 'なぜオープンソース？将来有料になりますか？',
+    'q7.a': 'クリーナーはあなたのファイルを削除するので、何をしているか誰でも確認できるようコードを公開しています。現在はすべての機能が無料です。今後、API キー不要の AI クレジットのようなオプションの有料サービスを出す可能性はありますが、既存の機能が有料になることはありません。',
+  },
+  ko: {
+    'q6.a': '없습니다. Pika Clean은 macOS 전용으로, 메뉴 막대·휴지통·키체인 같은 Mac 고유 기능을 사용합니다. 현재 Windows와 Linux 버전은 없습니다.',
+    'q6.q': 'Windows 버전이 있나요?',
+    'nav.home': '홈',
+    'meta.title': 'Pika Clean · 알고 지우는 Mac 클리너',
+    'nav.features': '기능', 'nav.compare': '비교', 'nav.pricing': '가격', 'nav.faq': '자주 묻는 질문', 'nav.download': 'Mac용 다운로드',
+    'hero.tag': '무료 오픈 소스 · macOS 전용 · AI 설명',
+    'hero.title': '지우기 전에, 모든 파일을 이해하세요',
+    'hero.sub': '애매한 파일은 한 번 클릭하면 AI가 무엇인지, 지워도 되는지 알려 줍니다.',
+    'hero.feats': '저장 공간 정리 · 앱 삭제 · 속도 최적화 · 메뉴 막대 실시간 모니터',
+    'hero.cta': 'Mac용 무료 다운로드',
+    'hero.note': 'macOS 전용 (Apple 실리콘) · Windows 버전 없음 · 버전 {v} · 계정 가입 불필요',
+    'f.title': '앱 하나로 Mac 전체를 관리',
+    'f.lead': '자주 쓰는 정리와 유지 관리 기능을 네이티브한 화면으로 간단하게.',
+    'f1.t': '스마트 스캔과 정리', 'f1.d': '캐시, 로그, 휴지통, 오래된 다운로드, 크래시 덤프를 한 번에 찾습니다. 캐시는 바로 삭제하고 개인 파일은 휴지통으로만 옮깁니다.',
+    'f2.t': '앱 제거', 'f2.d': '환경설정, 캐시, 지원 파일까지 함께 지워 흔적을 남기지 않습니다.',
+    'f3.t': '속도 최적화', 'f3.d': '메모리 확보, 로그인 항목 관리, 무거운 프로세스 종료, 유지 관리 작업 실행.',
+    'f4.t': '메뉴 막대 모니터', 'f4.d': 'CPU, GPU, 메모리, 디스크, 네트워크, 배터리, 온도, 팬 속도를 클릭 한 번으로 확인.',
+    'f5.t': '개발자 딥 클린', 'f5.d': 'Xcode, 시뮬레이터, Docker, 패키지 관리자 캐시와 Claude, Cursor 같은 AI 도구의 캐시와 오래된 대화.',
+    'f6.t': '공간 지도', 'f6.d': '시동 디스크 전체를 집계해 큰 파일의 위치를 보여 주고, 필요 없는 개인 파일은 바로 휴지통으로 옮깁니다.',
+    'ai.title': '모르는 파일은 AI에게',
+    'ai.lead': '일반 클리너는 “이 폴더는 2 GB”라고만 합니다. Pika Clean은 누가 만들었는지, 지우면 어떻게 되는지, 지금 지워도 되는지 알려 줍니다.',
+    'ai1.t': '항목별 설명', 'ai1.d': '캐시나 프로세스를 클릭하면 정체를 알 수 있습니다.',
+    'ai2.t': '한 문장으로 정리', 'ai2.d': '“공간을 비워 줘, 다운로드는 건드리지 마”라고 하면 AI가 골라 줍니다.',
+    'ai3.t': '느려진 원인 진단', 'ai3.d': '“왜 Mac이 느려졌지?”라고 물으면 현재 사용량을 바탕으로 원인과 해결책을 제시합니다.',
+    'ai4.t': '제거 전 안내와 다운로드 정리', 'ai4.d': '앱을 지우기 전에 잃게 될 것을 알려 주고, 다운로드 폴더를 용도별로 묶어 줍니다.',
+    'ai.privacy': '🔒 AI는 이미 로그인된 Claude Code 또는 직접 입력한 API 키로 작동합니다. 경로·크기·카테고리만 보내며 파일 내용은 읽지도, 올리지도 않습니다. AI는 제안만 하고, 모든 삭제는 사용자가 확인해야 합니다.',
+    'c.title': '다른 제품과 비교', 'c.lead': '구독도, 여러 개의 단일 기능 도구도 필요 없습니다.',
+    'c.sub': '구독형 클리너', 'c.free': '무료 단일 기능 도구', 'c.os': 'macOS 기본 기능',
+    'c.part': '일부',
+    'c.r1': 'AI가 파일의 정체와 삭제 영향을 설명',
+    'c.r2': '정리·제거·최적화를 앱 하나에서',
+    'c.r3': '메뉴 막대 실시간 모니터 (온도·팬 포함)',
+    'c.r4': '개발 도구와 AI 도구 캐시 정리',
+    'c.r5': '계정 불필요, 데이터는 Mac에만',
+    'c.r6': '가격',
+    'c.p1': '무료 오픈 소스', 'c.p2': '연간 구독', 'c.p3': '무료',
+    'p.title': '모든 기능 무료', 'p.lead': '코드는 GPLv3 오픈 소스입니다. 나중에 선택형 유료 서비스가 생길 수 있지만, 지금 있는 기능은 계속 무료입니다.',
+    'p.free': '무료', 'p.freePrice': '$0', 'p.freePer': '오픈 소스, 평생 무료',
+    'p.f1': '정리, 앱 제거, 속도 최적화, 메뉴 막대 모니터', 'p.f2': '개발자 딥 클린과 공간 지도', 'p.f3': '모든 AI 기능(내 Claude Code 또는 API 키 사용)', 'p.f4': '자동 업데이트',
+    'p.supBtn': 'Afdian에서 후원하기',
+    'q.title': '자주 묻는 질문',
+    'q1.q': '“개발자를 확인할 수 없음”이라고 나오면?',
+    'q1.a': '앱은 아직 Apple Developer ID로 서명되지 않았습니다. 처음 실행이 차단된 뒤 “시스템 설정 → 개인정보 보호 및 보안”에서 아래쪽의 “그래도 열기”를 누르고 로그인 암호를 입력하세요. 한 번만 하면 됩니다. “손상되었기 때문에 열 수 없습니다”라고 나오면 앱을 “응용 프로그램” 폴더로 옮긴 뒤 “터미널”에서 xattr -cr "/Applications/Pika Clean.app"을 실행하고 다시 여세요.',
+    'q2.q': '중요한 파일을 지우지는 않나요?',
+    'q2.a': '바로 삭제하는 것은 다시 생성되는 캐시와 로그뿐입니다. 개인 파일과 앱은 항상 휴지통으로 옮기므로 비우기 전까지 언제든 복원할 수 있습니다. 오래된 다운로드 같은 개인 파일은 기본으로 선택되지 않습니다.',
+    'q3.q': 'AI가 내 파일을 업로드하나요?',
+    'q3.a': '아니요. AI는 클릭할 때만 작동하며, 경로(사용자 이름 제외)·크기·카테고리·마지막 사용 시점만 받습니다. 파일 내용은 읽지 않습니다. 처음 사용할 때 동의를 먼저 받습니다.',
+    'q4.q': '어떤 Mac을 지원하나요?',
+    'q4.a': 'Apple 실리콘(M 시리즈) Mac을 지원합니다.',
+    'q5.q': '업데이트는 어떻게 하나요?',
+    'q5.a': '앱을 실행할 때 새 버전을 자동으로 확인하고 클릭 한 번으로 업데이트합니다.',
+    'end.title': 'Mac을 산뜻하게', 'end.lead': '무료로 다운로드하고 몇 초 만에 첫 스캔을 끝내세요.',
+    'foot': 'macOS 전용 · Windows 버전 없음 · GPLv3 오픈 소스',
+    'hero.gh': 'GitHub에서 소스 보기',
+    'c.r7': '오픈 소스, 누구나 코드 확인 가능',
+    'p.ai': 'AI 크레딧',
+    'p.aiPrice': '출시 예정',
+    'p.aiPer': '선택형 월 구독',
+    'p.a1': 'API 키를 직접 발급·설정할 필요 없음',
+    'p.a2': '설치 후 바로 모든 AI 기능 사용',
+    'p.a3': '수익은 프로젝트 개발에 사용',
+    'p.aiBtn': 'GitHub에서 소식 받기',
+    'p.sup': '후원자',
+    'p.supPrice': '원하는 만큼',
+    'p.supPer': '자발적 후원',
+    'p.s1': '프로젝트가 계속되도록 지원',
+    'p.s2': '기능 잠금 해제 없이 순수한 후원',
+    'q7.q': '왜 오픈 소스인가요? 나중에 유료가 되나요?',
+    'q7.a': '클리너는 파일을 삭제하므로 무엇을 하는지 누구나 확인할 수 있게 코드를 공개합니다. 지금은 모든 기능이 무료입니다. 나중에 API 키가 필요 없는 AI 크레딧 같은 선택형 유료 서비스가 생길 수 있지만, 기존 기능이 유료로 바뀌지는 않습니다.',
+  },
+
+};
+const HTML_LANG = { zh: 'zh-CN', 'zh-Hant': 'zh-Hant', en: 'en', ja: 'ja', ko: 'ko' };
+
+function detect() {
+  const q = new URLSearchParams(location.search).get('lang');
+  if (T[q]) return q;
+  try { const s = localStorage.getItem('lang'); if (T[s]) return s; } catch {}
+  for (const l of navigator.languages || [navigator.language]) {
+    const x = l.toLowerCase();
+    if (/^zh-(tw|hk|mo|hant)/.test(x)) return 'zh-Hant';
+    if (x.startsWith('zh')) return 'zh';
+    if (x.startsWith('ja')) return 'ja';
+    if (x.startsWith('ko')) return 'ko';
+    if (x.startsWith('en')) return 'en';
+  }
+  return 'en';
+}
+
+function apply(lang) {
+  const d = T[lang];
+  document.documentElement.lang = HTML_LANG[lang];
+  document.title = d['meta.title'];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = d[el.dataset.i18n].replace('{v}', VERSION);
+  });
+  document.getElementById('lang').value = lang;
+}
+
+document.querySelectorAll('.dl').forEach(a => a.href = DMG);
+document.querySelectorAll('.gh').forEach(a => a.href = REPO);
+document.querySelectorAll('.sponsor').forEach(a => a.href = SPONSOR);
+const sel = document.getElementById('lang');
+sel.addEventListener('change', () => {
+  try { localStorage.setItem('lang', sel.value); } catch {}
+  apply(sel.value);
+});
+apply(detect());
+
+const PAGES = [...document.querySelectorAll('.page')].map(p => p.dataset.page);
+function route() {
+  const page = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.dataset.page === page));
+  document.querySelectorAll('.links a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + page));
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>
