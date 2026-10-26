@@ -4,7 +4,7 @@
 
 开源的 macOS 清理软件：菜单栏系统监控、清理空间，以及用 AI 解释「这是什么、能不能删」。
 
-![Pika Clean](website/main.jpg)
+![Pika Clean 演示：扫描后点一下，AI 解释缓存能不能删](website/demo.gif)
 
 ## 功能
 

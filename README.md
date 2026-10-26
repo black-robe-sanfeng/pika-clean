@@ -4,7 +4,7 @@ English · [简体中文](README.zh-CN.md)
 
 An open-source Mac cleaner that tells you what a file is, and whether it's safe to delete, before you delete it.
 
-![Pika Clean](website/main.jpg)
+![Pika Clean demo: scan, then AI explains whether a cache is safe to delete](website/demo.gif)
 
 ## Features
 
