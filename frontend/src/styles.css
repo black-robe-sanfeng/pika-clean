@@ -57,6 +57,7 @@ small{color:var(--sub);font-size:12px}
 /* 行首没有图标的分组，分隔线从文字左缘开始 */
 .group.plain .row+.row{background-position:14px 0}
 label.row,button.row{cursor:pointer}
+.chk-inline{display:inline-flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;white-space:nowrap}
 button.row{width:100%;text-align:left}
 .row.sel{background-color:var(--fill)}
 .row.off{opacity:.55}

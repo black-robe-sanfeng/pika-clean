@@ -152,6 +152,85 @@ pub fn init(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// 菜单栏要显示的项（`MenubarShow` 的三个开关），每轮采样都要读，放内存里不去读设置文件。
+static MENUBAR: Mutex<crate::db::MenubarShow> = Mutex::new(crate::db::MenubarShow { cpu: false, mem: false, disk: false });
+/// 上一次设到菜单栏上的文字。没变就不设，免得每轮采样都重画菜单栏。
+static LAST_TITLE: Mutex<String> = Mutex::new(String::new());
+
+pub fn set_menubar(show: crate::db::MenubarShow) {
+    *MENUBAR.lock().unwrap() = show;
+}
+
+/// 图标旁边的文字，如「CPU 12%  内存 63%  磁盘 71%」；什么都不显示时为空。
+fn title(show: crate::db::MenubarShow, snap: &crate::model::Snapshot) -> String {
+    let pct = |used: u64, total: u64| if total == 0 { 0 } else { (used as f64 * 100.0 / total as f64).round() as u32 };
+    let mut parts = Vec::new();
+    if show.cpu {
+        parts.push(format!("CPU {}%", snap.cpu.usage_pct.round() as u32));
+    }
+    if show.mem {
+        parts.push(format!("{} {}%", t("内存"), pct(snap.mem.used_bytes, snap.mem.total_bytes)));
+    }
+    if show.disk {
+        parts.push(format!("{} {}%", t("磁盘"), pct(snap.disk.used_bytes, snap.disk.total_bytes)));
+    }
+    parts.join("  ")
+}
+
+pub fn update_title(app: &AppHandle, snap: &crate::model::Snapshot) {
+    let text = title(*MENUBAR.lock().unwrap(), snap);
+    let mut last = LAST_TITLE.lock().unwrap();
+    if *last == text {
+        return;
+    }
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        if text.is_empty() {
+            let _ = tray.set_title(None::<&str>);
+        } else {
+            #[cfg(target_os = "macos")]
+            let _ = tray.with_inner_tray_icon({
+                let text = text.clone();
+                move |inner| {
+                    let button = objc2::MainThreadMarker::new().and_then(|mtm| inner.ns_status_item()?.button(mtm));
+                    if let Some(button) = button {
+                        styled_title(&button, &text);
+                    }
+                }
+            });
+            #[cfg(not(target_os = "macos"))]
+            let _ = tray.set_title(Some(text.as_str()));
+        }
+    }
+    *last = text;
+}
+
+/// 把「CPU 12%  内存 63%」画成富文本：标签小号淡色，数字加粗、等宽（数字跳动时宽度不变，不左右抖）。
+/// 颜色用系统的动态色，跟着菜单栏深浅色走。
+#[cfg(target_os = "macos")]
+fn styled_title(button: &objc2_app_kit::NSStatusBarButton, text: &str) {
+    use objc2::{runtime::AnyObject, AllocAnyThread};
+    use objc2_app_kit::{NSColor, NSFont, NSFontAttributeName, NSFontWeightSemibold, NSForegroundColorAttributeName};
+    use objc2_foundation::{NSAttributedString, NSDictionary, NSMutableAttributedString, NSString};
+    // SAFETY: 这几个是 AppKit 导出的常量，只读。
+    let (font_key, color_key, semibold) = unsafe { (NSFontAttributeName, NSForegroundColorAttributeName, NSFontWeightSemibold) };
+    let label_font = NSFont::systemFontOfSize(10.5);
+    let value_font = NSFont::monospacedDigitSystemFontOfSize_weight(13.0, semibold);
+    let (label_color, value_color) = (NSColor::secondaryLabelColor(), NSColor::labelColor());
+    let segment = |s: &str, font: &NSFont, color: &NSColor| {
+        let attrs = NSDictionary::from_slices(&[font_key, color_key], &[AsRef::<AnyObject>::as_ref(font), AsRef::<AnyObject>::as_ref(color)]);
+        // SAFETY: 属性字典里只有字体和颜色，类型与键对应。
+        unsafe { NSAttributedString::initWithString_attributes(NSAttributedString::alloc(), &NSString::from_str(s), Some(&attrs)) }
+    };
+    let title = NSMutableAttributedString::new();
+    for (i, part) in text.split("  ").enumerate() {
+        let (label, value) = part.rsplit_once(' ').unwrap_or(("", part));
+        let gap = if i == 0 { "" } else { "   " };
+        title.appendAttributedString(&segment(&format!("{gap}{label} "), &label_font, &label_color));
+        title.appendAttributedString(&segment(value, &value_font, &value_color));
+    }
+    button.setAttributedTitle(&title);
+}
+
 /// 主窗口和面板都收起来，程序坞图标也去掉，只留菜单栏图标。
 fn hide_to_menu_bar(app: &AppHandle) {
     for label in ["main", POPOVER] {
@@ -202,5 +281,22 @@ pub fn intercept_quit(app: &AppHandle) {
         let cls = delegate.class() as *const _ as *mut _;
         let added = objc2::ffi::class_addMethod(cls, sel!(applicationShouldTerminate:), imp, c"Q@:@".as_ptr());
         debug_assert!(added.as_bool(), "应用代理已经有 applicationShouldTerminate:");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::MenubarShow;
+
+    #[test]
+    fn title_lists_only_chosen_items() {
+        let mut snap = crate::metrics::Sampler::new().sample(false, false);
+        snap.cpu.usage_pct = 12.4;
+        (snap.mem.used_bytes, snap.mem.total_bytes) = (63, 100);
+        (snap.disk.used_bytes, snap.disk.total_bytes) = (71, 0);
+        assert_eq!(title(MenubarShow::default(), &snap), "");
+        assert_eq!(title(MenubarShow { cpu: true, mem: true, disk: false }, &snap), "CPU 12%  内存 63%");
+        assert_eq!(title(MenubarShow { cpu: false, mem: false, disk: true }, &snap), "磁盘 0%", "容量读不到时不除以零");
     }
 }

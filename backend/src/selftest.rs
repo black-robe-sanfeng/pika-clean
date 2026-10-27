@@ -147,6 +147,7 @@ fn scenario(r: &Run) {
     r.eval("main", "const d=document.querySelector('.dialog'); note('首次启动的说明', d ? d.innerText.replace(/\\n+/g,' | ') : '没有出现'); [...document.querySelectorAll('.dialog .btn')].find(b=>b.textContent.trim()==='开始使用')?.click()");
     sleep(800);
     r.shot("main", "01-扫描-未开始");
+    r.eval("main", "note('扫描首页的趋势和近 7 天', [...document.querySelectorAll('.s-idle .trend')].map(x=>x.innerText.replace(/\\n+/g,' ')).join(' ‖ ') || '没有显示')");
     r.eval("main", "document.querySelector('.orb').click()");
     sleep(250);
     r.shot("main", "02-扫描-进行中");
@@ -159,9 +160,9 @@ fn scenario(r: &Run) {
     }
     sleep(1500);
     r.shot("main", "03-扫描-完成");
-    r.eval("main", "note('扫描完成页的文字', document.querySelector('.s-done').innerText.replace(/\\n+/g,' | '))");
+    r.eval("main", "note('扫描完成页的文字', (document.querySelector('.view:not([hidden]) .scroll')?.innerText ?? '').slice(0,600).replace(/\\n+/g,' | '))");
 
-    r.eval("main", "[...document.querySelectorAll('.nav button')].find(b=>b.textContent.includes('系统垃圾')).click()");
+    r.eval("main", "[...document.querySelectorAll('.nav button')].find(b=>b.textContent.includes('智能扫描')).click()");
     sleep(900);
     r.shot("main", "04-清理空间");
     r.eval("main", "note('清理空间的类别', [...document.querySelectorAll('.view:not([hidden]) label.row')].map(x=>x.innerText.replace(/\\n+/g,' ')).join(' ‖ '))");
@@ -230,7 +231,7 @@ fn scenario(r: &Run) {
     r.eval("main", "[...document.querySelectorAll('.nav button')].find(b=>b.textContent.includes('智能扫描')).click(); [...document.querySelectorAll('button')].find(b=>b.textContent.includes('生成 AI 总结'))?.click()");
     wait_ai();
     r.shot("main", "10-AI-扫描总结");
-    r.eval("main", "note('AI 的扫描总结', document.querySelector('.s-done .ai-box')?.innerText.replace(/\\n+/g,' '))");
+    r.eval("main", "note('AI 的扫描总结', document.querySelector('.view:not([hidden]) .ai-box')?.innerText.replace(/\\n+/g,' '))");
 
     // ---- 卸载软件：自己放一个假应用进去，只卸它 ----
     let apps_dir = home.join("Applications");

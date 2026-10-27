@@ -37,8 +37,9 @@ fi
 
 make package
 
-TGZ=pikaclean-$V-aarch64.app.tar.gz
-DMG=pikaclean-$V-aarch64.dmg
+# universal 包：Intel 和 Apple 芯片共用同一个文件
+TGZ=pikaclean-$V-universal.app.tar.gz
+DMG=pikaclean-$V-universal.dmg
 # 一律不让 CDN 缓存：同一个版本重发时文件名不变，缓存住旧包会和 latest.json 里的新签名对不上，更新就装不上
 put() { npx --yes wrangler@4 r2 object put "$BUCKET/$1" --file "$2" --remote --cache-control no-cache; }
 
@@ -47,12 +48,16 @@ put "$DMG" "$DIR"/*.dmg
 V=$V URL=$BASE/$TGZ node -e '
 const e = process.env;
 const signature = require("fs").readFileSync("release-artifacts/Pika Clean.app.tar.gz.sig", "utf8");
-console.log(JSON.stringify({ version: e.V, notes: e.NOTES || "", pub_date: new Date().toISOString(), platforms: { "darwin-aarch64": { signature, url: e.URL } } }, null, 2));
+// 两种芯片指向同一个 universal 包；老版本（只打了 aarch64）读的也是 darwin-aarch64，照样能收到更新
+const mac = { signature, url: e.URL };
+console.log(JSON.stringify({ version: e.V, notes: e.NOTES || "", pub_date: new Date().toISOString(), platforms: { "darwin-aarch64": mac, "darwin-x86_64": mac } }, null, 2));
 ' > "$DIR/latest.json"
 put latest.json "$DIR/latest.json"
 
 # 官网的下载链接和显示的版本号跟着改；官网要重新部署才生效
 sed -i '' "s/^const VERSION = '[0-9.]*';/const VERSION = '$V';/" website/index.html
+# 0.1.3 及以前只有 aarch64 包；从 universal 包开始，官网的下载链接跟着换后缀
+sed -i '' 's/-aarch64\.dmg/-universal.dmg/' website/index.html
 
 echo "已发布 $V"
 echo "新用户下载：$BASE/$DMG"

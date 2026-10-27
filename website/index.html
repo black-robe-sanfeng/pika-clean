@@ -176,6 +176,7 @@
       <a class="btn btn-ghost gh" target="_blank" rel="noopener" data-i18n="hero.gh"></a>
     </div>
     <div class="note" data-i18n="hero.note"></div>
+    <div class="note"><a href="install.html" data-i18n="hero.install"></a></div>
     <div class="shot">
       <img class="main" src="main.jpg" width="1200" height="780" alt="Pika Clean">
       <img class="side" src="menubar.jpg" width="520" height="648" alt="">
@@ -305,8 +306,8 @@
 
 <script>
 // 版本号由 scripts/release.sh 发布时自动改成刚发布的版本（R2 上的安装包文件名带版本号）
-const VERSION = '0.1.3';
-const DMG = `https://dl.daoly.top/pikaclean-${VERSION}-aarch64.dmg`;
+const VERSION = '0.1.4';
+const DMG = `https://dl.daoly.top/pikaclean-${VERSION}-universal.dmg`;
 const REPO = 'https://github.com/black-robe-sanfeng/pika-clean';
 const SPONSOR = 'https://afdian.com/a/black-robe-sanfeng';
 
@@ -322,13 +323,14 @@ const T = {
     'hero.sub': '拿不准的文件，点一下，AI 告诉你它是什么、能不能删。',
     'hero.feats': '清理空间 · 卸载软件 · 优化速度 · 菜单栏实时监控',
     'hero.cta': '免费下载 Mac 版',
-    'hero.note': '仅支持 macOS（Apple 芯片）· 暂无 Windows 版 · 版本 {v} · 无需注册账号',
+    'hero.note': '仅支持 macOS（Intel 与 Apple 芯片）· 暂无 Windows 版 · 版本 {v} · 无需注册账号',
+    'hero.install': '首次打开被系统拦住？看图文安装指南 →',
     'f.title': '一个应用，管好整台 Mac',
     'f.lead': '常用的清理和维护功能都在这里，界面原生、操作简单。',
     'f1.t': '智能扫描与清理', 'f1.d': '一键找出缓存、日志、废纸篓、旧下载和崩溃转储。缓存直接删除，个人文件只移到废纸篓。',
     'f2.t': '卸载软件', 'f2.d': '连同偏好设置、缓存和支持文件一起删除，不留残渣。',
     'f3.t': '优化速度', 'f3.d': '释放内存、管理开机启动项、结束占资源的进程、运行系统维护任务。',
-    'f4.t': '菜单栏监控', 'f4.d': 'CPU、GPU、内存、磁盘、网络、电池、温度和风扇转速，点一下菜单栏图标就能看到。',
+    'f4.t': '菜单栏监控', 'f4.d': 'CPU、GPU、内存、磁盘、网络、电池、温度和风扇转速，点一下菜单栏图标就能看到；也可以把用量直接显示在菜单栏上。',
     'f5.t': '开发者深度清理', 'f5.d': 'Xcode、模拟器、Docker、包管理器缓存，以及 Claude、Cursor 等 AI 工具的缓存和旧对话。',
     'f6.t': '空间去向', 'f6.d': '统计整个启动盘，看清大文件都在哪，不需要的个人文件可以直接移到废纸篓。',
     'ai.title': '看不懂的文件，问 AI',
@@ -360,7 +362,7 @@ const T = {
     'q3.q': 'AI 会上传我的文件吗？',
     'q3.a': '不会。AI 只在你点击时调用，发送的只有路径（不含用户名）、大小、类别和多久没用，不读取任何文件内容。第一次使用前会先征得你的同意。',
     'q4.q': '支持哪些 Mac？',
-    'q4.a': '目前支持 Apple 芯片（M 系列）的 Mac。',
+    'q4.a': 'Intel 和 Apple 芯片（M 系列）的 Mac 都支持，同一个安装包。',
     'q5.q': '怎么更新？',
     'q5.a': '应用启动时会自动检查新版本，有更新会弹窗提示，一键完成。',
     'end.title': '让你的 Mac 清爽起来', 'end.lead': '免费下载，几秒钟完成第一次扫描。',
@@ -393,13 +395,14 @@ const T = {
     'hero.sub': '拿不準的檔案，點一下，AI 告訴你它是什麼、能不能刪。',
     'hero.feats': '清理空間 · 解除安裝軟體 · 最佳化速度 · 選單列即時監控',
     'hero.cta': '免費下載 Mac 版',
-    'hero.note': '僅支援 macOS（Apple 晶片）· 暫無 Windows 版 · 版本 {v} · 無需註冊帳號',
+    'hero.note': '僅支援 macOS（Intel 與 Apple 晶片）· 暫無 Windows 版 · 版本 {v} · 無需註冊帳號',
+    'hero.install': '第一次開啟被系統擋住？看圖文安裝指南 →',
     'f.title': '一個 App，管好整台 Mac',
     'f.lead': '常用的清理和維護功能都在這裡，介面原生、操作簡單。',
     'f1.t': '智慧掃描與清理', 'f1.d': '一鍵找出快取、日誌、垃圾桶、舊下載和當機傾印。快取直接刪除，個人檔案只移到垃圾桶。',
     'f2.t': '解除安裝軟體', 'f2.d': '連同偏好設定、快取和支援檔案一起刪除，不留殘渣。',
     'f3.t': '最佳化速度', 'f3.d': '釋放記憶體、管理登入項目、結束佔用資源的程序、執行系統維護工作。',
-    'f4.t': '選單列監控', 'f4.d': 'CPU、GPU、記憶體、磁碟、網路、電池、溫度和風扇轉速，點一下選單列圖示就能看到。',
+    'f4.t': '選單列監控', 'f4.d': 'CPU、GPU、記憶體、磁碟、網路、電池、溫度和風扇轉速，點一下選單列圖示就能看到；也可以把用量直接顯示在選單列上。',
     'f5.t': '開發者深度清理', 'f5.d': 'Xcode、模擬器、Docker、套件管理器快取，以及 Claude、Cursor 等 AI 工具的快取和舊對話。',
     'f6.t': '空間去向', 'f6.d': '統計整個啟動磁碟，看清大檔案都在哪，不需要的個人檔案可以直接移到垃圾桶。',
     'ai.title': '看不懂的檔案，問 AI',
@@ -431,7 +434,7 @@ const T = {
     'q3.q': 'AI 會上傳我的檔案嗎？',
     'q3.a': '不會。AI 只在你點擊時呼叫，傳送的只有路徑（不含使用者名稱）、大小、類別和多久沒用，不讀取任何檔案內容。第一次使用前會先徵得你的同意。',
     'q4.q': '支援哪些 Mac？',
-    'q4.a': '目前支援 Apple 晶片（M 系列）的 Mac。',
+    'q4.a': 'Intel 和 Apple 晶片（M 系列）的 Mac 都支援，同一個安裝檔。',
     'q5.q': '怎麼更新？',
     'q5.a': 'App 啟動時會自動檢查新版本，有更新會跳出提示，一鍵完成。',
     'end.title': '讓你的 Mac 清爽起來', 'end.lead': '免費下載，幾秒鐘完成第一次掃描。',
@@ -464,13 +467,14 @@ const T = {
     'hero.sub': 'Not sure about a file? One click and AI tells you what it is and whether it’s safe to delete.',
     'hero.feats': 'Free up space · Uninstall apps · Speed up · Live menu bar stats',
     'hero.cta': 'Download free for Mac',
-    'hero.note': 'macOS only (Apple silicon) · No Windows version · Version {v} · No account needed',
+    'hero.note': 'macOS only (Intel and Apple silicon) · No Windows version · Version {v} · No account needed',
+    'hero.install': 'Blocked on first launch? See the install guide →',
     'f.title': 'One app to keep your whole Mac in shape',
     'f.lead': 'All the everyday cleanup and maintenance tools, with a native look and simple controls.',
     'f1.t': 'Smart scan & cleanup', 'f1.d': 'Find caches, logs, Trash, old downloads and crash dumps in one click. Caches are deleted; personal files only go to the Trash.',
     'f2.t': 'Uninstaller', 'f2.d': 'Removes apps together with their preferences, caches and support files. Nothing left behind.',
     'f3.t': 'Speed up', 'f3.d': 'Free up memory, manage login items, quit heavy processes and run maintenance tasks.',
-    'f4.t': 'Menu bar monitor', 'f4.d': 'CPU, GPU, memory, disk, network, battery, temperature and fan speed, one click away.',
+    'f4.t': 'Menu bar monitor', 'f4.d': 'CPU, GPU, memory, disk, network, battery, temperature and fan speed, one click away. You can also show usage right in the menu bar.',
     'f5.t': 'Developer deep clean', 'f5.d': 'Xcode, simulators, Docker, package manager caches, plus caches and old chats from AI tools like Claude and Cursor.',
     'f6.t': 'Space map', 'f6.d': 'See where every gigabyte on your startup disk goes, and move personal files you don’t need to the Trash.',
     'ai.title': 'Don’t know what it is? Ask AI',
@@ -502,7 +506,7 @@ const T = {
     'q3.q': 'Does AI upload my files?',
     'q3.a': 'No. AI runs only when you click, and it receives only paths (without your username), sizes, categories and last-used dates. File contents are never read. You’re asked for consent before first use.',
     'q4.q': 'Which Macs are supported?',
-    'q4.a': 'Macs with Apple silicon (M-series chips).',
+    'q4.a': 'Both Intel Macs and Macs with Apple silicon (M-series chips), from the same download.',
     'q5.q': 'How do updates work?',
     'q5.a': 'The app checks for new versions on launch and offers a one-click update.',
     'end.title': 'Give your Mac a fresh start', 'end.lead': 'Download for free and finish your first scan in seconds.',
@@ -535,13 +539,14 @@ const T = {
     'hero.sub': '迷うファイルはクリックするだけ。AI が正体と削除してよいかを教えてくれます。',
     'hero.feats': '空き容量の確保 · アプリの削除 · 高速化 · メニューバーで常時監視',
     'hero.cta': 'Mac 版を無料ダウンロード',
-    'hero.note': 'macOS 専用（Apple シリコン）· Windows 版はありません · バージョン {v} · アカウント登録不要',
+    'hero.note': 'macOS 専用（Intel と Apple シリコン）· Windows 版はありません · バージョン {v} · アカウント登録不要',
+    'hero.install': '初回起動がブロックされたら？インストールガイド →',
     'f.title': 'ひとつのアプリで Mac 全体をケア',
     'f.lead': '日常的なクリーンアップとメンテナンスをネイティブな操作感で。',
     'f1.t': 'スマートスキャンと削除', 'f1.d': 'キャッシュ、ログ、ゴミ箱、古いダウンロード、クラッシュダンプをワンクリックで検出。キャッシュは直接削除、個人ファイルはゴミ箱へ移すだけ。',
     'f2.t': 'アンインストーラ', 'f2.d': '環境設定、キャッシュ、サポートファイルまでまとめて削除。残骸を残しません。',
     'f3.t': '高速化', 'f3.d': 'メモリ解放、ログイン項目の管理、重いプロセスの終了、メンテナンスの実行。',
-    'f4.t': 'メニューバー監視', 'f4.d': 'CPU、GPU、メモリ、ディスク、ネットワーク、バッテリー、温度、ファン回転数をワンクリックで。',
+    'f4.t': 'メニューバー監視', 'f4.d': 'CPU、GPU、メモリ、ディスク、ネットワーク、バッテリー、温度、ファン回転数をワンクリックで。使用率をメニューバーに直接表示することもできます。',
     'f5.t': '開発者向けディープクリーン', 'f5.d': 'Xcode、シミュレータ、Docker、パッケージマネージャのキャッシュ、Claude や Cursor など AI ツールのキャッシュと古い会話。',
     'f6.t': '容量の行き先', 'f6.d': '起動ディスク全体を集計し、大きなファイルの場所を可視化。不要な個人ファイルはそのままゴミ箱へ。',
     'ai.title': 'わからないファイルは AI に聞く',
@@ -573,7 +578,7 @@ const T = {
     'q3.q': 'AI にファイルがアップロードされる？',
     'q3.a': 'いいえ。AI はクリックしたときだけ動き、送るのはパス（ユーザー名は除く）、サイズ、カテゴリ、最終使用日だけです。ファイルの中身は読みません。初回利用時には同意を求めます。',
     'q4.q': '対応している Mac は？',
-    'q4.a': 'Apple シリコン（M シリーズ）搭載の Mac に対応しています。',
+    'q4.a': 'Intel Mac と Apple シリコン（M シリーズ）搭載の Mac の両方に、同じインストーラで対応しています。',
     'q5.q': 'アップデートは？',
     'q5.a': '起動時に新しいバージョンを自動確認し、ワンクリックで更新できます。',
     'end.title': 'Mac をすっきりさせよう', 'end.lead': '無料でダウンロードして、数秒で最初のスキャンを。',
@@ -606,13 +611,14 @@ const T = {
     'hero.sub': '애매한 파일은 한 번 클릭하면 AI가 무엇인지, 지워도 되는지 알려 줍니다.',
     'hero.feats': '저장 공간 정리 · 앱 삭제 · 속도 최적화 · 메뉴 막대 실시간 모니터',
     'hero.cta': 'Mac용 무료 다운로드',
-    'hero.note': 'macOS 전용 (Apple 실리콘) · Windows 버전 없음 · 버전 {v} · 계정 가입 불필요',
+    'hero.note': 'macOS 전용 (Intel 및 Apple 실리콘) · Windows 버전 없음 · 버전 {v} · 계정 가입 불필요',
+    'hero.install': '첫 실행이 막혔나요? 설치 안내 보기 →',
     'f.title': '앱 하나로 Mac 전체를 관리',
     'f.lead': '자주 쓰는 정리와 유지 관리 기능을 네이티브한 화면으로 간단하게.',
     'f1.t': '스마트 스캔과 정리', 'f1.d': '캐시, 로그, 휴지통, 오래된 다운로드, 크래시 덤프를 한 번에 찾습니다. 캐시는 바로 삭제하고 개인 파일은 휴지통으로만 옮깁니다.',
     'f2.t': '앱 제거', 'f2.d': '환경설정, 캐시, 지원 파일까지 함께 지워 흔적을 남기지 않습니다.',
     'f3.t': '속도 최적화', 'f3.d': '메모리 확보, 로그인 항목 관리, 무거운 프로세스 종료, 유지 관리 작업 실행.',
-    'f4.t': '메뉴 막대 모니터', 'f4.d': 'CPU, GPU, 메모리, 디스크, 네트워크, 배터리, 온도, 팬 속도를 클릭 한 번으로 확인.',
+    'f4.t': '메뉴 막대 모니터', 'f4.d': 'CPU, GPU, 메모리, 디스크, 네트워크, 배터리, 온도, 팬 속도를 클릭 한 번으로 확인. 사용량을 메뉴 막대에 바로 표시할 수도 있습니다.',
     'f5.t': '개발자 딥 클린', 'f5.d': 'Xcode, 시뮬레이터, Docker, 패키지 관리자 캐시와 Claude, Cursor 같은 AI 도구의 캐시와 오래된 대화.',
     'f6.t': '공간 지도', 'f6.d': '시동 디스크 전체를 집계해 큰 파일의 위치를 보여 주고, 필요 없는 개인 파일은 바로 휴지통으로 옮깁니다.',
     'ai.title': '모르는 파일은 AI에게',
@@ -644,7 +650,7 @@ const T = {
     'q3.q': 'AI가 내 파일을 업로드하나요?',
     'q3.a': '아니요. AI는 클릭할 때만 작동하며, 경로(사용자 이름 제외)·크기·카테고리·마지막 사용 시점만 받습니다. 파일 내용은 읽지 않습니다. 처음 사용할 때 동의를 먼저 받습니다.',
     'q4.q': '어떤 Mac을 지원하나요?',
-    'q4.a': 'Apple 실리콘(M 시리즈) Mac을 지원합니다.',
+    'q4.a': 'Intel Mac과 Apple 실리콘(M 시리즈) Mac을 같은 설치 파일로 모두 지원합니다.',
     'q5.q': '업데이트는 어떻게 하나요?',
     'q5.a': '앱을 실행할 때 새 버전을 자동으로 확인하고 클릭 한 번으로 업데이트합니다.',
     'end.title': 'Mac을 산뜻하게', 'end.lead': '무료로 다운로드하고 몇 초 만에 첫 스캔을 끝내세요.',

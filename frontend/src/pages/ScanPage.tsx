@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useState } from 'react';
-import { api, type UsageTrend, useAiAvailable } from '../api';
+import { api, type UsageTrend, useAiAvailable, type WeekReport } from '../api';
 import type { ScanState } from '../app/useScan';
 import { AiAnswer } from '../components/AiAnswer';
 import { Icon } from '../components/Icon';
@@ -69,6 +69,27 @@ function Trend() {
   );
 }
 
+/** 近 7 天做了什么、磁盘多用了多少。数字全在本机算，不调用 AI；什么都没有时不显示 */
+function Week() {
+  const [week, setWeek] = useState<WeekReport | null>(null);
+  useEffect(() => {
+    api.weekReport().then(setWeek, () => setWeek(null));
+  }, []);
+  if (!week) return null;
+  const { journal: j, disk_delta_bytes: d } = week;
+  const parts = [
+    j.cleaned_bytes > 0 && t('清理了 {0}', bytes(j.cleaned_bytes)),
+    j.uninstalled > 0 && t('卸载了 {0} 个应用', j.uninstalled),
+    d != null && (d >= 0 ? t('磁盘多用了 {0}', bytes(d)) : t('磁盘少用了 {0}', bytes(-d))),
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <div className="trend">
+      <p>{t('近 7 天：{0}', parts.join(' · '))}</p>
+    </div>
+  );
+}
+
 /** 还没有扫描结果时的样子：一个大按钮，第一次扫描时显示进度。有了结果之后这一页换成 CleanPage 的结果列表。 */
 export function ScanPage({ scan, onScan, onCancel }: { scan: ScanState; onScan: () => void; onCancel: () => void }) {
   const progress = scan.phase === 'run' ? scan.progress : null;
@@ -81,6 +102,7 @@ export function ScanPage({ scan, onScan, onCancel }: { scan: ScanState; onScan: 
         </button>
         <p>{t('检查缓存、日志、废纸篓和旧下载，找出可以腾出的空间')}</p>
         <Trend />
+        <Week />
       </div>
 
       <div className="s-run">

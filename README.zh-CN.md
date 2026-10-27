@@ -12,13 +12,13 @@
 - **AI 解释**：拿不准的文件点一下，AI 告诉你它是什么、删了会怎样；也可以一句话说「帮我腾出空间，别动下载的文件」。
 - **卸载软件**：连同偏好设置、缓存和支持文件一起删干净。
 - **优化速度**：释放内存、管理开机启动项、结束占资源的进程。
-- **菜单栏监控**：CPU、GPU、内存、磁盘、网络、电池、温度、风扇。
+- **菜单栏监控**：CPU、GPU、内存、磁盘、网络、电池、温度、风扇；也可以把用量直接显示在菜单栏上。
 - **开发者深度清理**：Xcode、模拟器、Docker、包管理器，以及 Claude、Cursor 等 AI 工具的缓存。
 - **空间去向**：看清整个启动盘的空间都花在哪了。
 
 ## 安装
 
-- 从[官网](https://pika-clean.vercel.app)下载 dmg，目前支持 Apple 芯片的 Mac。
+- 从[官网](https://pika-clean.vercel.app)下载 dmg，同时支持 Intel 和 Apple 芯片的 Mac。
 - 或者自己编译，见下面的「常用命令」。
 
 应用目前还没有苹果开发者签名，第一次打开会被系统拦住：
@@ -97,20 +97,6 @@ make dev PORT=18541
 frontend/   界面（React + TypeScript）
 backend/    Rust + Tauri：系统指标、扫描、删除、AI 调用
 website/    产品官网（静态页面）
-```
-
-## 后端的探针命令
-
-在 `backend/` 下运行，用来不开界面直接看后端的真实输出：
-
-```bash
-cargo run --example metrics_dump                # 打印 3 份系统指标
-cargo run --example scan_dump                   # 只读扫描本机，打印各类别大小
-cargo run --example scan_dump -- --dry-remove   # 再做一次不删文件的删除演练
-cargo run --example remove_dry -- /tmp/某个空目录  # 在假目录树上演练删除
-cargo run --example ai_ask -- explain-item ~/Library/Caches/com.apple.Safari   # 真实调用一次 AI
-cargo run --example sensors_dump                # 温度、显卡占用、风扇转速、电池健康
-cargo run --release --example apps_dump         # 只读列出本机可卸载的应用
 ```
 
 ## 在真实应用里自测

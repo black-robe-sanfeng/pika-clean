@@ -211,6 +211,8 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
       return new Promise((resolve) => setTimeout(() => resolve([{ path: '/Users/demo/Library/Containers/com.gone.app', size_bytes: 0.3 * GB }]), 500));
     case 'apps_trash_orphans':
       return { freed_bytes: 0, trashed_bytes: 0.3 * GB, failed: [] };
+    case 'login_items_stale':
+      return mockLogins.filter((l) => l.kind === 'agent' && l.broken && l.enabled).map((l) => ({ ...l }));
     case 'login_items':
       return { items: mockLogins.map((l) => ({ ...l })), apps_unreadable: false };
     case 'login_item_set':
@@ -227,7 +229,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'update_check':
       return null;
     case 'settings_get':
-      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
+      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, menubar: { cpu: true, mem: false, disk: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
     case 'autostart_set':
       return args!.on;
     case 'ai_claude_set':
@@ -293,9 +295,12 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
       );
     case 'onboarded_set':
     case 'low_disk_alert_set':
+    case 'menubar_set':
       return undefined;
     case 'ai_diagnose':
       return fakeAi('（预览用的示例回答）内存压力偏高，主要来自浏览器和开发工具，可以关掉不用的标签页；磁盘已用 76%，暂时不影响速度；开机自启的后台项目有两个长期未用，建议在系统设置里关掉。');
+    case 'week_report':
+      return { journal: { cleaned_bytes: 3.1e9, uninstalled: 1, optimized: 2 }, disk_delta_bytes: 4.2e9 };
     case 'journal_summary':
       return { cleaned_bytes: 8.2 * 1024 ** 3, uninstalled: 3, optimized: 4 };
     case 'awake_get':

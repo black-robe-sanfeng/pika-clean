@@ -738,6 +738,17 @@ pub async fn login_item_set(app: AppHandle, kind: String, name: String, on: bool
     .await
 }
 
+/// 一键清理时顺带停用的启动项（规格 O-04 的「建议关闭」）：程序已经不存在、却还开着的启动代理。
+/// 只读配置文件，不去问「系统事件」，所以不会在清理页弹出自动化授权。
+#[tauri::command]
+pub async fn login_items_stale(app: AppHandle) -> Result<Vec<optimize::LoginItem>, String> {
+    blocking(move || {
+        let dir = app_dir(&app)?;
+        Ok(optimize::list("agent", &home(), &dir)?.into_iter().filter(|i| i.broken && i.enabled).collect())
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn login_item_remove(app: AppHandle, kind: String, name: String) -> Result<(), String> {
     blocking(move || {
@@ -795,6 +806,7 @@ pub struct SettingsView {
     pub api_key_set: bool,
     pub onboarded: bool,
     pub low_disk_alert: bool,
+    pub menubar: db::MenubarShow,
     pub full_disk_access: bool,
     pub version: String,
     /// 用户选的界面语言；空表示跟随系统
@@ -822,6 +834,7 @@ pub fn settings_get(app: AppHandle) -> SettingsView {
         api_key_set: crate::keychain::exists(),
         onboarded: stored.onboarded,
         low_disk_alert: !stored.mute_low_disk_alert,
+        menubar: stored.menubar,
         full_disk_access: permissions::has_full_disk_access(),
         version: app.package_info().version.to_string(),
         language: stored.language,
@@ -898,6 +911,16 @@ pub fn onboarded_set(app: AppHandle) -> Result<(), String> {
 pub fn low_disk_alert_set(app: AppHandle, on: bool) -> Result<(), String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     db::save_settings(&dir, &db::Settings { mute_low_disk_alert: !on, ..db::load_settings(&dir) }).map_err(|e| e.to_string())
+}
+
+/// 菜单栏图标旁边显示哪几项。存下来并马上生效。
+#[tauri::command]
+pub fn menubar_set(app: AppHandle, menubar: db::MenubarShow) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    db::save_settings(&dir, &db::Settings { menubar, ..db::load_settings(&dir) }).map_err(|e| e.to_string())?;
+    crate::tray::set_menubar(menubar);
+    crate::wake_sampler(&app);
+    Ok(())
 }
 
 // ---- 空间去向 ----
@@ -1088,6 +1111,14 @@ pub async fn update_install(app: AppHandle, on_progress: Channel<u8>) -> Result<
 #[tauri::command]
 pub fn usage_trend(app: AppHandle) -> Option<db::UsageTrend> {
     db::usage_trend(&db::load_usage(&app.path().app_data_dir().ok()?))
+}
+
+/// 扫描首页的「近 7 天」：清理记录加启动盘用量变化，全在本机算。
+#[tauri::command]
+pub fn week_report(app: AppHandle) -> Option<db::WeekReport> {
+    let dir = app.path().app_data_dir().ok()?;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
+    Some(db::WeekReport { journal: db::journal_summary_since(&dir, now.saturating_sub(db::WEEK_DAYS * 86_400_000)), disk_delta_bytes: db::week_delta(&db::load_usage(&dir)) })
 }
 
 /// 让 AI 解释用量趋势：只发每天是几天前和当天的已用量。

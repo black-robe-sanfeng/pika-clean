@@ -17,6 +17,9 @@ serde_json = "1"
 sysinfo = "0.39.6"
 libc = "0.2.190"
 objc2 = "0.6"
+# 菜单栏富文本标题。版本和功能跟 tauri 用的那份一致，不会多编译一份
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSAttributedString", "NSButton", "NSColor", "NSControl", "NSFont", "NSFontDescriptor", "NSResponder", "NSStatusBarButton", "NSStatusItem", "NSView"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSAttributedString", "NSDictionary", "NSString"] }
 trash = "5.2.9"
 
 # 自测：让应用自己走一遍真实流程并截取自己的窗口。只在开发时用，正式包不带。

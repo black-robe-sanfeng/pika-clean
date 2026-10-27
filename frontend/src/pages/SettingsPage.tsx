@@ -231,6 +231,23 @@ export function SettingsPage({ active }: { active: boolean }) {
             {t('去赞助')}
           </button>
         </div>
+        <div className="row">
+          <span className="grow">
+            <span>{t('菜单栏显示')}</span>
+            <small>{t('在菜单栏图标旁边用文字显示用量')}</small>
+          </span>
+          {(['cpu', 'mem', 'disk'] as const).map((k) => (
+            <label key={k} className="chk-inline">
+              <input
+                type="checkbox"
+                checked={s?.menubar[k] ?? false}
+                disabled={!s}
+                onChange={(e) => s && api.menubarSet({ ...s.menubar, [k]: e.target.checked }).then(reload)}
+              />
+              {k === 'cpu' ? 'CPU' : k === 'mem' ? t('内存') : t('磁盘')}
+            </label>
+          ))}
+        </div>
         <label className="row">
           <span className="grow">
             <span>{t('磁盘快满时提醒')}</span>

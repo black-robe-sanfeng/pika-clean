@@ -12,7 +12,7 @@ An open-source Mac cleaner that tells you what a file is, and whether it's safe 
 - **AI explanations**: click anything you're unsure about and AI tells you what it is and what happens if you delete it. Or just say "free up space, but don't touch my downloads".
 - **Uninstaller**: removes apps along with their preferences, caches, and support files.
 - **Speed up**: free memory, manage login items, quit resource-hungry processes.
-- **Menu bar monitor**: CPU, GPU, memory, disk, network, battery, temperature, and fans.
+- **Menu bar monitor**: CPU, GPU, memory, disk, network, battery, temperature, and fans. You can also show usage right in the menu bar.
 - **Developer cleanup**: Xcode, simulators, Docker, package managers, and caches from AI tools such as Claude and Cursor.
 - **Space map**: see where your startup disk's space actually goes.
 
@@ -20,7 +20,7 @@ Available in English, 简体中文, 繁體中文, 日本語, and 한국어.
 
 ## Install
 
-- Download the dmg from the [website](https://pika-clean.vercel.app). Apple silicon Macs only for now.
+- Download the dmg from the [website](https://pika-clean.vercel.app). Runs on both Intel and Apple silicon Macs.
 - Or build it yourself (see [Build from source](#build-from-source)).
 
 The app isn't signed with an Apple Developer ID yet, so macOS blocks the first launch:

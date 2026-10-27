@@ -46,6 +46,16 @@ pub struct Settings {
     pub language: Option<String>,
     /// 用户点了「不再提示」的条目路径：扫描时照样列出，但不再默认勾选
     pub ignored: Vec<String>,
+    /// 菜单栏图标旁边用文字显示哪几项（规格 O-06）。默认都不显示，只有图标
+    pub menubar: MenubarShow,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct MenubarShow {
+    pub cpu: bool,
+    pub mem: bool,
+    pub disk: bool,
 }
 
 pub fn load_settings(dir: &Path) -> Settings {
@@ -131,10 +141,18 @@ pub fn append_optimize(dir: &Path, what: &str) -> std::io::Result<()> {
 
 /// 把清理记录汇总成三个数。记录文件不存在或某一行损坏都不算错。
 pub fn journal_summary(dir: &Path) -> JournalSummary {
+    journal_summary_since(dir, 0)
+}
+
+/// 只算 `since_ms` 之后（含）记下的。
+pub fn journal_summary_since(dir: &Path, since_ms: u64) -> JournalSummary {
     let mut sum = JournalSummary::default();
     let text = std::fs::read_to_string(dir.join(JOURNAL)).unwrap_or_default();
     for entry in text.lines().filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok()) {
         let n = |k: &str| entry[k].as_u64().unwrap_or(0);
+        if n("ts_ms") < since_ms {
+            continue;
+        }
         match entry["kind"].as_str().unwrap_or("clean") {
             "uninstall" => sum.uninstalled += n("apps"),
             "optimize" => sum.optimized += 1,
@@ -163,6 +181,23 @@ pub struct UsageTrend {
     pub bytes_per_day: i64,
     /// 用量在涨时，照这个速度还有几天写满；不在涨时为空
     pub days_to_full: Option<u64>,
+}
+
+/// 周报：最近 7 天的清理记录，加上这几天启动盘多用（负数是少用）了多少。数字全在本机算，不调用 AI。
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub struct WeekReport {
+    pub journal: JournalSummary,
+    /// 用量记录不足两天时为空
+    pub disk_delta_bytes: Option<i64>,
+}
+
+pub const WEEK_DAYS: u64 = 7;
+
+/// 最后一条记录和它 7 天内最早一条之间的差。
+pub fn week_delta(all: &[UsagePoint]) -> Option<i64> {
+    let last = *all.last()?;
+    let first = all.iter().find(|p| p.day + WEEK_DAYS >= last.day)?;
+    (first.day < last.day).then(|| last.used_bytes as i64 - first.used_bytes as i64)
 }
 
 /// 记下今天的已用量。今天已经记过（比如当天重启了应用）就不再记。
@@ -255,6 +290,18 @@ mod tests {
             }
         });
         assert_eq!(journal_summary(&t.0).optimized, 400);
+    }
+
+    #[test]
+    fn 周报只算七天内() {
+        let p = |day, used| UsagePoint { day, used_bytes: used, total_bytes: 1000 };
+        assert_eq!(week_delta(&[p(1, 100), p(5, 300), p(12, 350)]), Some(50), "第 1 天超出 7 天，从第 5 天算");
+        assert_eq!(week_delta(&[p(12, 350)]), None);
+        assert_eq!(week_delta(&[p(1, 100), p(12, 350)]), None, "7 天内只有一条");
+        let t = TempTree::new();
+        std::fs::write(t.0.join(JOURNAL), "{\"kind\":\"clean\",\"freed_bytes\":5,\"ts_ms\":10}\n{\"kind\":\"clean\",\"freed_bytes\":7,\"ts_ms\":20}\n").unwrap();
+        assert_eq!(journal_summary_since(&t.0, 15).cleaned_bytes, 7);
+        assert_eq!(journal_summary(&t.0).cleaned_bytes, 12);
     }
 
     #[test]

@@ -188,6 +188,13 @@ export interface Plan {
   backend: AiBackend;
 }
 
+/** 扫描首页的「近 7 天」，全在本机算 */
+export interface WeekReport {
+  journal: JournalSummary;
+  /** 启动盘这 7 天多用了多少（负数是少用）；记录不足两天时为 null */
+  disk_delta_bytes: number | null;
+}
+
 export interface JournalSummary {
   cleaned_bytes: number;
   uninstalled: number;
@@ -267,6 +274,12 @@ export interface LoginItems {
 
 export type DockMode = 'show' | 'hide';
 
+export interface MenubarShow {
+  cpu: boolean;
+  mem: boolean;
+  disk: boolean;
+}
+
 export interface SettingsView {
   autostart: boolean;
   ai_consent: boolean;
@@ -281,6 +294,8 @@ export interface SettingsView {
   api_key_set: boolean;
   onboarded: boolean;
   low_disk_alert: boolean;
+  /** 菜单栏图标旁边用文字显示哪几项 */
+  menubar: MenubarShow;
   full_disk_access: boolean;
   version: string;
   /** 用户选的界面语言；null 表示跟随系统 */

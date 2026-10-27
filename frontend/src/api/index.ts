@@ -3,7 +3,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Lang } from '../lib/i18n.ts';
-import type { AdminTask, AiBackend, Answer, AppInfo, CareReport, ClaudeModel, CleanProgress, DevEnvReport, DevTarget, DeviceInfo, DockMode, Effort, JournalSummary, Leftover, LoginItem, LoginItems, Organized, Passwordless, Plan, Progress, RemoveResult, ScanReport, SettingsView, Snapshot, SpaceProgress, SpaceReport, Trashed, UninstallProgress, UpdateInfo, UsageTrend } from './types';
+import type { AdminTask, AiBackend, Answer, AppInfo, CareReport, ClaudeModel, CleanProgress, DevEnvReport, DevTarget, DeviceInfo, DockMode, Effort, JournalSummary, MenubarShow, Leftover, LoginItem, LoginItems, Organized, Passwordless, Plan, Progress, RemoveResult, ScanReport, SettingsView, Snapshot, SpaceProgress, SpaceReport, Trashed, UninstallProgress, UpdateInfo, UsageTrend, WeekReport } from './types';
 import { t } from '../lib/i18n.ts';
 
 export type * from './types';
@@ -80,6 +80,7 @@ export const api = {
   ignoreRemove: (path: string) => call<string[]>('ignore_remove', { path }),
   fullDiskAccess: () => call<boolean>('full_disk_access'),
   journalSummary: () => call<JournalSummary>('journal_summary'),
+  weekReport: () => call<WeekReport | null>('week_report'),
   awakeGet: () => call<boolean>('awake_get'),
   awakeSet: (on: boolean) => call<boolean>('awake_set', { on }),
   /** 锁住键盘若干秒，返回实际秒数。没有「辅助功能」权限时以字符串 no_access 拒绝 */
@@ -121,6 +122,7 @@ export const api = {
     return invoke<void>('update_install', { onProgress: channel });
   },
   loginItems: () => call<LoginItems>('login_items'),
+  loginItemsStale: () => call<LoginItem[]>('login_items_stale'),
   loginItemSet: (item: LoginItem, on: boolean) => call<void>('login_item_set', { kind: item.kind, name: item.name, on }),
   loginItemRemove: (item: LoginItem) => call<void>('login_item_remove', { kind: item.kind, name: item.name }),
   /** 弹出系统的选择应用窗口；返回 false 表示用户取消了 */
@@ -145,6 +147,7 @@ export const api = {
   aiOrganizeDownloads: (fresh?: boolean) => call<Organized>('ai_organize_downloads', { fresh }),
   onboardedSet: () => call<void>('onboarded_set'),
   lowDiskAlertSet: (on: boolean) => call<void>('low_disk_alert_set', { on }),
+  menubarSet: (menubar: MenubarShow) => call<void>('menubar_set', { menubar }),
   itemReveal: (id: string) => call<void>('item_reveal', { id }),
   aiBackends: () => call<string[]>('ai_backends'),
   aiConsent: () => call<void>('ai_consent'),

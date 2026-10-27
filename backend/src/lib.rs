@@ -49,15 +49,15 @@ pub(crate) fn apply_dock(app: &AppHandle) {
 fn daily_housekeeping(app: &AppHandle, snap: &model::Snapshot, last_alert_day: &mut Option<u64>, last_usage_day: &mut Option<u64>) {
     use tauri_plugin_notification::NotificationExt;
     let today = snap.ts_ms / 86_400_000;
-    // 先看磁盘是不是真快满了、今天提醒过没有，是才去读设置文件：绝大多数时候一次都不用读
-    if !db::should_alert_low_disk(snap.disk.used_bytes, snap.disk.total_bytes, false, *last_alert_day, today) {
-        return;
-    }
     let Ok(dir) = app.path().app_data_dir() else { return };
     if *last_usage_day != Some(today) && snap.disk.total_bytes > 0 {
         // 记不下来就算了，不打扰用户；当天重启时 record_usage 自己会跳过已经记过的
         let _ = db::record_usage(&dir, today, snap.disk.used_bytes, snap.disk.total_bytes);
         *last_usage_day = Some(today);
+    }
+    // 先看磁盘是不是真快满了、今天提醒过没有，是才去读设置文件：绝大多数时候一次都不用读
+    if !db::should_alert_low_disk(snap.disk.used_bytes, snap.disk.total_bytes, false, *last_alert_day, today) {
+        return;
     }
     // ponytail: 「今天提醒过没有」只记在内存里，当天重启应用会再提醒一次；嫌烦再存进设置文件
     let muted = db::load_settings(&dir).mute_low_disk_alert;
@@ -80,6 +80,7 @@ fn spawn_sampler(app: AppHandle) -> std::thread::Thread {
             // 进程列表任一窗口可见就刷新；温度、风扇这些只有菜单栏面板显示，面板可见才读
             let snap = sampler.sample(!shown.is_empty(), shown.iter().any(|l| l == tray::POPOVER));
             daily_housekeeping(&app, &snap, &mut last_alert_day, &mut last_usage_day);
+            tray::update_title(&app, &snap);
             *app.state::<commands::Latest>().0.lock().unwrap() = Some(snap.clone());
             // 收着的窗口不发：它重新显示时会叫醒采样线程马上补一份，曲线历史随快照下发，不会断档
             for label in &shown {
@@ -168,6 +169,7 @@ pub fn run() {
             commands::login_items,
             commands::login_item_set,
             commands::login_item_remove,
+            commands::login_items_stale,
             commands::login_item_add,
             commands::open_login_items_settings,
             commands::ai_diagnose,
@@ -185,6 +187,7 @@ pub fn run() {
             commands::ai_organize_downloads,
             commands::onboarded_set,
             commands::low_disk_alert_set,
+            commands::menubar_set,
             commands::item_reveal,
             commands::space_start,
             commands::space_cancel,
@@ -198,6 +201,7 @@ pub fn run() {
             commands::update_check,
             commands::update_install,
             commands::usage_trend,
+            commands::week_report,
             commands::ai_explain_trend,
         ])
         .setup(|app| {
@@ -213,6 +217,9 @@ pub fn run() {
             let language = app.path().app_data_dir().ok().and_then(|d| db::load_settings(&d).language);
             i18n::set(i18n::resolve(language.as_deref()));
             tray::init(app.handle())?;
+            if let Ok(dir) = app.path().app_data_dir() {
+                tray::set_menubar(db::load_settings(&dir).menubar);
+            }
             // 带 --hidden 启动（开机自启）时只留菜单栏，主窗口等第一次打开时再建（配置里 create 为 false）
             if !std::env::args().any(|a| a == "--hidden") {
                 tray::main_window(app.handle());

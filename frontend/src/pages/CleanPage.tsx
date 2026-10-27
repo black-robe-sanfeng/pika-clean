@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Check } from '../components/Check';
 import { DEV_COMMAND, DevEnvRows, DevEnvSheet, useDevEnv } from '../components/DevEnvGroup';
-import { api, revealMenu, type Category, type CategoryId, type CleanProgress, type Item, type RemoveResult, type ScanReport, type Trashed, useAiAvailable, useDisk, type Organized } from '../api';
+import { api, revealMenu, type Category, type CategoryId, type CleanProgress, type Item, type LoginItem, type RemoveResult, type ScanReport, type Trashed, useAiAvailable, useDisk, type Organized } from '../api';
 import type { ScanState } from '../app/useScan';
 import { AiAnswer } from '../components/AiAnswer';
 import { AskClean } from '../components/AskClean';
@@ -304,6 +304,9 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
   // 最近一次清理移到废纸篓的文件，可以放回原处
   const [trashed, setTrashed] = useState<Trashed[]>([]);
   const [trashedOpen, setTrashedOpen] = useState(false);
+  // 程序已经不存在、还开着的启动代理（规格 O-04 的「建议关闭」）。清理时顺带停用，停用随时能在优化页恢复
+  const [stale, setStale] = useState<LoginItem[]>([]);
+  const [offStale, setOffStale] = useState(true);
   const ai = useAiAvailable();
   // 开发环境（Docker、模拟器）用它们自己的命令清理，但和上面的类别一起算进底部的总数、一起清。
   // 只在完整扫描后重新读；清理后只改了报告的那几次不读
@@ -313,6 +316,7 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
 
   useEffect(() => {
     api.trashLast().then(setTrashed);
+    api.loginItemsStale().then(setStale, () => setStale([]));
     return api.onCleanProgress(setProgress);
   }, []);
 
@@ -396,6 +400,13 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
     if (dev.chosen.length) {
       await step('dev', () => api.devenvClean(dev.chosen.map((r) => r.target), false));
       dev.reload();
+    }
+    // 停用失效启动项不算进释放的空间；失败的只提示一句，不影响前面的结果
+    if (offStale && stale.length && !stopping.current) {
+      const off = await Promise.allSettled(stale.map((i) => api.loginItemSet(i, false)));
+      const ok = off.filter((r) => r.status === 'fulfilled').length;
+      if (ok < stale.length) errors.push(t('有 {0} 个失效的启动项没能停用', stale.length - ok));
+      api.loginItemsStale().then(setStale, () => setStale([]));
     }
     setBusy(false);
     setStage(null);
@@ -576,6 +587,15 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
                 <span className="num">{bytes(sizeOf(items))}</span>
               </div>
             ))}
+            {stale.length > 0 && (
+              <label className="row">
+                <span className="grow">
+                  <span>{t('停用 {0} 个失效的启动项', stale.length)}</span>
+                  <small>{t('它们要运行的程序已经不存在，每次登录都会启动失败。可以在「优化速度」里重新启用')}</small>
+                </span>
+                <input type="checkbox" checked={offStale} onChange={(e) => setOffStale(e.target.checked)} />
+              </label>
+            )}
             {dev.chosen.map((r) => (
               <div className="row" key={r.key}>
                 <span className="grow">

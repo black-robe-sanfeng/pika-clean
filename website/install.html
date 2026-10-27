@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安装 Pika Clean</title>
+<meta name="description" content="Pika Clean 安装指南：第一次打开被 macOS 拦住时怎么办。">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg1: #4a6cf0; --bg2: #2b2f93; --bg3: #191b5c;
+    --glass: rgba(255,255,255,.10); --glass-2: rgba(255,255,255,.16); --line: rgba(255,255,255,.18);
+    --text: #fff; --muted: rgba(255,255,255,.72); --dim: rgba(255,255,255,.5);
+    --accent: #b79aff; --ok: #4ade80; --cta: #fff; --cta-text: #2b2f93;
+    --mac-bg: #f5f5f7; --mac-line: #d9d9de; --mac-text: #1d1d1f; --mac-dim: #6e6e73; --mac-blue: #0a84ff;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scrollbar-width: none; }
+  html::-webkit-scrollbar { display: none; }
+  body {
+    margin: 0; color: var(--text); background: var(--bg3);
+    background-image: radial-gradient(1200px 700px at 15% -10%, var(--bg1), transparent 70%),
+                      radial-gradient(900px 600px at 100% 10%, #7a4fe0, transparent 65%),
+                      linear-gradient(180deg, var(--bg2), var(--bg3) 60%);
+    background-attachment: fixed;
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans", "Apple SD Gothic Neo", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: clip;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+  .glass { background: var(--glass); border: 1px solid var(--line); border-radius: 20px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+  /* 顶栏（与首页一致） */
+  header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(25,27,92,.45); border-bottom: 1px solid rgba(255,255,255,.08); }
+  .nav { display: flex; align-items: center; gap: 24px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; text-decoration: none; }
+  .brand img { width: 32px; height: 32px; }
+  .links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; }
+  .links a { text-decoration: none; color: var(--muted); }
+  .links a:hover, .links a.on { color: var(--text); }
+  .links a.on { font-weight: 600; }
+  select { appearance: none; background: var(--glass-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 6px 28px 6px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+  select option { color: #111; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; padding: 12px 26px; text-decoration: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; transition: transform .15s, box-shadow .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--cta); color: var(--cta-text); box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .btn-ghost { background: var(--glass-2); color: var(--text); border: 1px solid var(--line); }
+  .btn-sm { padding: 7px 16px; font-size: 14px; }
+
+  /* 标题区 */
+  .hero { padding-top: 72px; padding-bottom: 24px; text-align: center; }
+  .pill { display: inline-block; padding: 6px 14px; border-radius: 999px; background: var(--glass-2); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  h1 { font-size: clamp(28px, 4vw, 44px); font-weight: 700; line-height: 1.2; margin: 22px auto 16px; max-width: 18em; letter-spacing: -.01em; text-wrap: balance; }
+  .hero p { max-width: 34em; margin: 0 auto; color: rgba(255,255,255,.88); font-size: 18px; text-wrap: balance; }
+  h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.25; margin: 0 0 12px; text-align: center; letter-spacing: -.01em; }
+  .lead { text-align: center; color: var(--muted); max-width: 40em; margin: 0 auto 32px; }
+
+  /* 步骤 */
+  .steps { list-style: none; padding: 0; margin: 40px auto 0; max-width: 960px; display: grid; gap: 20px; counter-reset: s; }
+  .step { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; padding: 28px; }
+  .step .txt { min-width: 0; }
+  .num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--cta); color: var(--cta-text); font-weight: 700; margin-bottom: 14px; }
+  .step h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.35; }
+  .step p { margin: 0; color: var(--muted); font-size: 15px; }
+  .step .tip { margin-top: 12px; font-size: 13px; color: var(--dim); }
+
+  /* 仿 macOS 示意图（纯 CSS，非截图） */
+  .fig { min-width: 0; display: flex; justify-content: center; }
+  .mac { width: 100%; max-width: 380px; background: var(--mac-bg); color: var(--mac-text); border-radius: 12px; box-shadow: 0 24px 50px rgba(0,0,0,.35); overflow: hidden; font-size: 13px; line-height: 1.4; }
+  .mac .bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--mac-line); background: #ececf0; }
+  .mac .bar i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; display: block; }
+  .mac .bar i:nth-child(2) { background: #febc2e; } .mac .bar i:nth-child(3) { background: #28c840; }
+  .mac .bar span { flex: 1; text-align: center; font-size: 12px; color: var(--mac-dim); margin-right: 45px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mbtn { display: inline-block; padding: 5px 14px; border-radius: 7px; background: #fff; border: 1px solid var(--mac-line); font-size: 13px; color: var(--mac-text); white-space: nowrap; }
+  .mbtn.blue { background: var(--mac-blue); border-color: var(--mac-blue); color: #fff; }
+  .hot { position: relative; box-shadow: 0 0 0 3px rgba(255,196,0,.95), 0 0 0 7px rgba(255,196,0,.35); animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 3px rgba(255,196,0,.95), 0 0 0 11px rgba(255,196,0,0); } }
+  @media (prefers-reduced-motion: reduce) { .hot { animation: none; } }
+
+  /* 1 拖拽 */
+  .drag { display: flex; align-items: center; justify-content: space-around; gap: 8px; padding: 28px 16px 22px; }
+  .drag figure { margin: 0; text-align: center; font-size: 12px; color: var(--mac-dim); min-width: 0; }
+  .drag figure img { width: 64px; height: 64px; display: block; margin: 0 auto 6px; }
+  .folder { width: 72px; height: 56px; margin: 4px auto 10px; border-radius: 6px; background: linear-gradient(#6cc4ff, #2f9bf0); position: relative; display: grid; place-items: center; color: #fff; font-size: 22px; }
+  .folder::before { content: ""; position: absolute; left: 0; top: -7px; width: 30px; height: 10px; border-radius: 4px 4px 0 0; background: #4fb2f7; }
+  .arrow { font-size: 28px; color: var(--mac-blue); flex: none; }
+
+  /* 2 / 4 弹窗 */
+  .alert { max-width: 280px; padding: 22px 20px 18px; text-align: center; }
+  .alert .icon { position: relative; width: 56px; height: 56px; margin: 0 auto 12px; }
+  .alert .icon img { width: 56px; height: 56px; }
+  .alert .icon b { position: absolute; right: -4px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; background: #ffcc00; color: #1d1d1f; display: grid; place-items: center; font-size: 15px; }
+  .alert h4 { margin: 0 0 6px; font-size: 14px; }
+  .alert p { margin: 0 0 16px; color: var(--mac-dim); font-size: 12px; }
+  .alert .row { display: grid; gap: 8px; }
+  .alert .row .mbtn { display: block; }
+  .pw { display: block; text-align: left; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--mac-line); background: #fff; color: var(--mac-dim); letter-spacing: 3px; margin-bottom: 14px; }
+
+  /* 3 系统设置 */
+  .settings { display: grid; grid-template-columns: 38% 1fr; min-height: 210px; }
+  .settings aside { background: #e8e8ed; padding: 10px 8px; display: grid; align-content: start; gap: 4px; font-size: 12px; min-width: 0; }
+  .settings aside span { padding: 5px 8px; border-radius: 6px; color: var(--mac-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .settings aside span.on { background: var(--mac-blue); color: #fff; }
+  .settings .pane { padding: 14px; min-width: 0; display: flex; flex-direction: column; }
+  .settings .pane .h { font-weight: 700; margin-bottom: 10px; }
+  .settings .pane .sk { height: 8px; border-radius: 4px; background: #e2e2e7; margin-bottom: 8px; }
+  .settings .sec { margin-top: auto; background: #fff; border: 1px solid var(--mac-line); border-radius: 8px; padding: 10px; }
+  .settings .sec small { display: block; color: var(--mac-dim); font-size: 11px; margin-bottom: 4px; }
+  .settings .sec p { margin: 0 0 10px; font-size: 12px; color: var(--mac-text); }
+  .settings .sec .r { text-align: right; }
+
+  /* 已损坏 */
+  .fix { max-width: 960px; margin: 0 auto; padding: 28px; }
+  .fix ol { margin: 0 0 18px; padding-left: 1.4em; color: var(--muted); display: grid; gap: 6px; }
+  .code { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 10px 16px; }
+  .code code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font: 14px/1.5 ui-monospace, "SF Mono", Menlo, monospace; color: #e9e3ff; scrollbar-width: thin; padding: 4px 0; }
+  .code .btn { flex: none; }
+  .fix .tip { margin: 14px 0 0; font-size: 13px; color: var(--dim); }
+
+  section { padding: 56px 0; }
+  .final { text-align: center; padding: 48px 24px; max-width: 960px; margin: 0 auto 24px; }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  footer { padding: 32px 0 48px; color: var(--dim); font-size: 13px; text-align: center; }
+
+  @media (max-width: 860px) {
+    .nav { flex-wrap: wrap; height: auto; padding: 10px 20px; row-gap: 6px; }
+    .links { order: 3; width: 100%; margin: 0; overflow-x: auto; gap: 20px; white-space: nowrap; padding-bottom: 4px; }
+    .nav select { margin-left: auto; }
+    .step { grid-template-columns: 1fr; gap: 22px; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    .nav { gap: 12px; }
+    .brand span { display: none; }
+    .hero { padding-top: 44px; }
+    .hero p { font-size: 16px; }
+    section { padding: 40px 0; }
+    .step, .fix { padding: 20px; }
+    .code { flex-wrap: wrap; }
+    .code code { flex-basis: 100%; white-space: normal; word-break: break-all; }
+    .code .btn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><img src="icon.svg" alt=""><span>Pika Clean</span></a>
+    <nav class="links">
+      <a href="index.html" data-i18n="nav.home"></a>
+      <a href="install.html" class="on" data-i18n="nav.install"></a>
+      <a href="index.html#faq" data-i18n="nav.faq"></a>
+      <a class="gh" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <select id="lang" aria-label="Language">
+      <option value="zh">简体中文</option>
+      <option value="zh-Hant">繁體中文</option>
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+      <option value="ko">한국어</option>
+    </select>
+    <a class="btn btn-primary btn-sm dl" data-i18n="nav.download"></a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <span class="pill" data-i18n="i.tag"></span>
+    <h1 data-i18n="i.title"></h1>
+    <p data-i18n="i.sub"></p>
+  </div>
+
+  <div class="wrap">
+    <ol class="steps">
+      <li class="step glass">
+        <div class="txt">
+          <div class="num">1</div>
+          <h3 data-i18n="s1.t"></h3>
+          <p data-i18n="s1.d"></p>
+        </div>
+        <div class="fig" aria-hidden="true">
+          <div class="mac">
+            <div class="bar"><i></i><i></i><i></i><span>Pika Clean</span></div>
+            <div class="drag">
+              <figure><img src="icon.svg" alt="">Pika Clean</figure>
+              <span class="arrow">→</span>
+              <figure><div class="folder">A</div><span data-i18n="m.apps"></span></figure>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li class="step glass">
+        <div class="txt">
+          <div class="num">2</div>
+          <h3 data-i18n="s2.t"></h3>
+          <p data-i18n="s2.d"></p>
+        </div>
+        <div class="fig" aria-hidden="true">
+          <div class="mac alert">
+            <div class="icon"><img src="icon.svg" alt=""><b>!</b></div>
+            <h4 data-i18n="m2.title"></h4>
+            <p data-i18n="m2.body"></p>
+            <div class="row">
+              <span class="mbtn blue hot" data-i18n="m2.done"></span>
+              <span class="mbtn" data-i18n="m2.trash"></span>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li class="step glass">
+        <div class="txt">
+          <div class="num">3</div>
+          <h3 data-i18n="s3.t"></h3>
+          <p data-i18n="s3.d"></p>
+          <p class="tip" data-i18n="s3.tip"></p>
+        </div>
+        <div class="fig" aria-hidden="true">
+          <div class="mac">
+            <div class="bar"><i></i><i></i><i></i><span data-i18n="m.settings"></span></div>
+            <div class="settings">
+              <aside>
+                <span data-i18n="m3.general"></span>
+                <span data-i18n="m3.appearance"></span>
+                <span class="on" data-i18n="m.privacy"></span>
+                <span data-i18n="m3.desktop"></span>
+              </aside>
+              <div class="pane">
+                <div class="h" data-i18n="m.privacy"></div>
+                <div class="sk"></div><div class="sk" style="width:70%"></div>
+                <div class="sec">
+                  <small data-i18n="m3.security"></small>
+                  <p data-i18n="m3.blocked"></p>
+                  <div class="r"><span class="mbtn hot" data-i18n="m.open"></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li class="step glass">
+        <div class="txt">
+          <div class="num">4</div>
+          <h3 data-i18n="s4.t"></h3>
+          <p data-i18n="s4.d"></p>
+        </div>
+        <div class="fig" aria-hidden="true">
+          <div class="mac alert">
+            <div class="icon"><img src="icon.svg" alt=""></div>
+            <h4 data-i18n="m.privacy"></h4>
+            <p data-i18n="m4.body"></p>
+            <span class="pw">••••••••</span>
+            <div class="row"><span class="mbtn blue hot" data-i18n="m4.ok"></span></div>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <section id="damaged">
+    <div class="wrap">
+      <h2 data-i18n="d.title"></h2>
+      <p class="lead" data-i18n="d.lead"></p>
+      <div class="fix glass">
+        <ol>
+          <li data-i18n="d.s1"></li>
+          <li data-i18n="d.s2"></li>
+          <li data-i18n="d.s3"></li>
+          <li data-i18n="d.s4"></li>
+        </ol>
+        <div class="code">
+          <code id="cmd">xattr -cr "/Applications/Pika Clean.app"</code>
+          <button class="btn btn-primary btn-sm" id="copy" type="button" data-i18n="d.copy"></button>
+        </div>
+        <p class="tip" data-i18n="d.tip"></p>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><div class="final glass">
+    <h2 data-i18n="end.title"></h2>
+    <p class="lead" data-i18n="end.lead"></p>
+    <div class="ctas">
+      <a class="btn btn-primary dl" data-i18n="nav.download"></a>
+      <a class="btn btn-ghost" href="index.html#faq" data-i18n="end.faq"></a>
+    </div>
+  </div></div>
+</main>
+
+<footer><div class="wrap">© 2026 Pika Clean · <span data-i18n="foot"></span></div></footer>
+
+<script>
+// 下载按钮回到首页下载：安装包地址带版本号，只由 scripts/release.sh 维护在 index.html 一处
+const REPO = 'https://github.com/black-robe-sanfeng/pika-clean';
+
+const T = {
+  zh: {
+    'meta.title': '安装 Pika Clean · 第一次打开的设置步骤',
+    'nav.home': '首页', 'nav.install': '安装指南', 'nav.faq': '常见问题', 'nav.download': '下载 Mac 版',
+    'i.tag': '安装指南 · 只需设置一次',
+    'i.title': '第一次打开被 macOS 拦住？跟着做就好',
+    'i.sub': 'Pika Clean 暂时还没有苹果开发者签名，所以第一次打开时 macOS 会拦一下。按下面 4 步放行一次，以后就能正常打开。',
+    's1.t': '把 Pika Clean 拖进「应用程序」',
+    's1.d': '双击下载好的 dmg，把 Pika Clean 图标拖到「应用程序」文件夹，然后在「应用程序」里双击打开一次。',
+    's2.t': '被拦住了，先点「完成」',
+    's2.d': 'macOS 会提示无法验证应用。这是正常现象，点「完成」关掉提示，不要点「移到废纸篓」。',
+    's3.t': '去「隐私与安全性」点「仍要打开」',
+    's3.d': '打开「系统设置 → 隐私与安全性」，滚到页面最底部的「安全性」一栏，会看到 Pika Clean 被阻止的提示，点旁边的「仍要打开」。',
+    's3.tip': '没看到这一行？回到第 1 步再双击打开一次，被拦后马上来这里看。',
+    's4.t': '输入登录密码，搞定',
+    's4.d': '可能会再弹一次确认框，继续点「仍要打开」，然后输入你的 Mac 登录密码。之后 Pika Clean 就会正常启动，以后不会再提示。',
+    'm.apps': '应用程序', 'm.settings': '系统设置', 'm.privacy': '隐私与安全性', 'm.open': '仍要打开',
+    'm2.title': '“Pika Clean”未打开', 'm2.body': 'Apple 无法验证“Pika Clean”是否包含恶意软件。', 'm2.done': '完成', 'm2.trash': '移到废纸篓',
+    'm3.general': '通用', 'm3.appearance': '外观', 'm3.desktop': '桌面与程序坞', 'm3.security': '安全性',
+    'm3.blocked': '已阻止“Pika Clean”以保护 Mac。',
+    'm4.body': '输入密码以允许此操作。', 'm4.ok': '好',
+    'd.title': '提示「已损坏，应移到废纸篓」？',
+    'd.lead': '应用并没有坏，这是 macOS 对下载来的未签名应用加的限制。在「终端」里执行一行命令就能解除。',
+    'd.s1': '先确认 Pika Clean 已经在「应用程序」文件夹里（第 1 步）。',
+    'd.s2': '打开「终端」：按 ⌘ 空格，输入“终端”后回车。',
+    'd.s3': '点下面的「复制」，在终端里粘贴（⌘V），按回车。',
+    'd.s4': '回到「应用程序」重新打开 Pika Clean。如果还被拦，再做一遍上面的第 3、4 步。',
+    'd.copy': '复制', 'd.copied': '已复制 ✓',
+    'd.tip': '这行命令只是去掉 macOS 给下载文件加的隔离标记，不会改动应用内容，执行后没有任何输出是正常的。',
+    'end.title': '还是打不开？', 'end.lead': '到常见问题看看，或者在 GitHub 提一个 Issue，附上 macOS 版本和提示截图。',
+    'end.faq': '查看常见问题',
+    'foot': '仅适用于 macOS · 暂无 Windows 版 · 以 GPLv3 开源',
+  },
+  'zh-Hant': {
+    'meta.title': '安裝 Pika Clean · 第一次開啟的設定步驟',
+    'nav.home': '首頁', 'nav.install': '安裝指南', 'nav.faq': '常見問題', 'nav.download': '下載 Mac 版',
+    'i.tag': '安裝指南 · 只需設定一次',
+    'i.title': '第一次開啟被 macOS 擋住？跟著做就好',
+    'i.sub': 'Pika Clean 目前還沒有 Apple 開發者簽署，所以第一次開啟時 macOS 會擋一下。照下面 4 步放行一次，之後就能正常開啟。',
+    's1.t': '把 Pika Clean 拖進「應用程式」',
+    's1.d': '雙擊下載好的 dmg，把 Pika Clean 圖示拖到「應用程式」檔案夾，然後在「應用程式」裡雙擊開啟一次。',
+    's2.t': '被擋住了，先點「完成」',
+    's2.d': 'macOS 會提示無法驗證 App。這是正常現象，點「完成」關掉提示，不要點「丟到垃圾桶」。',
+    's3.t': '到「隱私權與安全性」點「強制打開」',
+    's3.d': '打開「系統設定 → 隱私權與安全性」，捲到頁面最底部的「安全性」一欄，會看到 Pika Clean 被阻擋的提示，點旁邊的「強制打開」。',
+    's3.tip': '沒看到這一行？回到第 1 步再雙擊開啟一次，被擋後馬上來這裡看。',
+    's4.t': '輸入登入密碼，完成',
+    's4.d': '可能會再跳出一次確認框，繼續點「強制打開」，然後輸入你的 Mac 登入密碼。之後 Pika Clean 就會正常啟動，以後不會再提示。',
+    'm.apps': '應用程式', 'm.settings': '系統設定', 'm.privacy': '隱私權與安全性', 'm.open': '強制打開',
+    'm2.title': '「Pika Clean」未開啟', 'm2.body': 'Apple 無法驗證「Pika Clean」是否包含惡意軟體。', 'm2.done': '完成', 'm2.trash': '丟到垃圾桶',
+    'm3.general': '一般', 'm3.appearance': '外觀', 'm3.desktop': '桌面與 Dock', 'm3.security': '安全性',
+    'm3.blocked': '已阻擋「Pika Clean」以保護你的 Mac。',
+    'm4.body': '輸入密碼來允許此操作。', 'm4.ok': '好',
+    'd.title': '提示「已損毀，應該丟到垃圾桶」？',
+    'd.lead': 'App 並沒有壞，這是 macOS 對下載來的未簽署 App 加的限制。在「終端機」執行一行指令就能解除。',
+    'd.s1': '先確認 Pika Clean 已經在「應用程式」檔案夾裡（第 1 步）。',
+    'd.s2': '打開「終端機」：按 ⌘ 空白鍵，輸入「終端機」後按 Return。',
+    'd.s3': '點下面的「複製」，在終端機裡貼上（⌘V），按 Return。',
+    'd.s4': '回到「應用程式」重新開啟 Pika Clean。如果還被擋，再做一次上面的第 3、4 步。',
+    'd.copy': '複製', 'd.copied': '已複製 ✓',
+    'd.tip': '這行指令只是移除 macOS 為下載檔案加上的隔離標記，不會更動 App 內容，執行後沒有任何輸出是正常的。',
+    'end.title': '還是打不開？', 'end.lead': '到常見問題看看，或在 GitHub 開一個 Issue，附上 macOS 版本和提示截圖。',
+    'end.faq': '查看常見問題',
+    'foot': '僅適用於 macOS · 暫無 Windows 版 · 以 GPLv3 開源',
+  },
+  en: {
+    'meta.title': 'Install Pika Clean · First-launch setup',
+    'nav.home': 'Home', 'nav.install': 'Install guide', 'nav.faq': 'FAQ', 'nav.download': 'Download for Mac',
+    'i.tag': 'Install guide · One-time setup',
+    'i.title': 'macOS blocked the first launch? Here’s the fix',
+    'i.sub': 'Pika Clean isn’t signed with an Apple Developer ID yet, so macOS stops it the first time. Allow it once with the 4 steps below and it opens normally from then on.',
+    's1.t': 'Drag Pika Clean into Applications',
+    's1.d': 'Open the downloaded dmg, drag the Pika Clean icon onto the Applications folder, then double-click it in Applications to open it once.',
+    's2.t': 'When it’s blocked, click “Done”',
+    's2.d': 'macOS says it can’t verify the app. That’s expected. Click “Done” to close the alert. Don’t click “Move to Trash”.',
+    's3.t': 'Click “Open Anyway” in Privacy & Security',
+    's3.d': 'Open System Settings → Privacy & Security and scroll to the Security section at the very bottom. You’ll see a note that Pika Clean was blocked. Click “Open Anyway” next to it.',
+    's3.tip': 'Don’t see it? Go back to step 1, open the app again, and check here right after it’s blocked.',
+    's4.t': 'Enter your login password. Done.',
+    's4.d': 'You may get one more confirmation. Click “Open Anyway” again, then enter your Mac login password. Pika Clean launches and you won’t be asked again.',
+    'm.apps': 'Applications', 'm.settings': 'System Settings', 'm.privacy': 'Privacy & Security', 'm.open': 'Open Anyway',
+    'm2.title': '“Pika Clean” Not Opened', 'm2.body': 'Apple could not verify “Pika Clean” is free of malware.', 'm2.done': 'Done', 'm2.trash': 'Move to Trash',
+    'm3.general': 'General', 'm3.appearance': 'Appearance', 'm3.desktop': 'Desktop & Dock', 'm3.security': 'Security',
+    'm3.blocked': '“Pika Clean” was blocked to protect your Mac.',
+    'm4.body': 'Enter your password to allow this.', 'm4.ok': 'OK',
+    'd.title': 'Says the app “is damaged”?',
+    'd.lead': 'The app isn’t actually damaged. macOS adds this restriction to unsigned apps you download. One Terminal command removes it.',
+    'd.s1': 'Make sure Pika Clean is already in your Applications folder (step 1).',
+    'd.s2': 'Open Terminal: press ⌘ Space, type “Terminal” and press Return.',
+    'd.s3': 'Click “Copy” below, paste into Terminal (⌘V) and press Return.',
+    'd.s4': 'Open Pika Clean from Applications again. If it’s still blocked, repeat steps 3 and 4 above.',
+    'd.copy': 'Copy', 'd.copied': 'Copied ✓',
+    'd.tip': 'The command only removes the quarantine flag macOS puts on downloaded files. It doesn’t change the app. No output after running it is normal.',
+    'end.title': 'Still won’t open?', 'end.lead': 'Check the FAQ, or open an issue on GitHub with your macOS version and a screenshot of the message.',
+    'end.faq': 'Read the FAQ',
+    'foot': 'For macOS only · No Windows version · Open source under GPLv3',
+  },
+  ja: {
+    'meta.title': 'Pika Clean のインストール · 初回起動の設定',
+    'nav.home': 'ホーム', 'nav.install': 'インストール', 'nav.faq': 'よくある質問', 'nav.download': 'Mac 版をダウンロード',
+    'i.tag': 'インストールガイド · 設定は一度だけ',
+    'i.title': '初回起動が macOS にブロックされたら',
+    'i.sub': 'Pika Clean はまだ Apple の Developer ID で署名されていないため、初回起動時に macOS が止めます。下の 4 ステップで一度許可すれば、次回からは普通に開けます。',
+    's1.t': 'Pika Clean を「アプリケーション」へドラッグ',
+    's1.d': 'ダウンロードした dmg を開き、Pika Clean のアイコンを「アプリケーション」フォルダへドラッグ。「アプリケーション」内でダブルクリックして一度開きます。',
+    's2.t': 'ブロックされたら「完了」をクリック',
+    's2.d': 'アプリを検証できないと表示されますが、想定どおりです。「完了」で閉じてください。「ゴミ箱に入れる」は押さないでください。',
+    's3.t': '「プライバシーとセキュリティ」で「このまま開く」',
+    's3.d': '「システム設定 → プライバシーとセキュリティ」を開き、いちばん下の「セキュリティ」までスクロール。Pika Clean がブロックされた旨の表示の横にある「このまま開く」をクリックします。',
+    's3.tip': '表示がない場合は、ステップ 1 でもう一度開き、ブロックされた直後にここを確認してください。',
+    's4.t': 'ログインパスワードを入力して完了',
+    's4.d': 'もう一度確認が出たら「このまま開く」をクリックし、Mac のログインパスワードを入力します。Pika Clean が起動し、以後は表示されません。',
+    'm.apps': 'アプリケーション', 'm.settings': 'システム設定', 'm.privacy': 'プライバシーとセキュリティ', 'm.open': 'このまま開く',
+    'm2.title': '“Pika Clean”は開かれませんでした', 'm2.body': 'Apple は“Pika Clean”にマルウェアが含まれていないことを検証できませんでした。', 'm2.done': '完了', 'm2.trash': 'ゴミ箱に入れる',
+    'm3.general': '一般', 'm3.appearance': '外観', 'm3.desktop': 'デスクトップと Dock', 'm3.security': 'セキュリティ',
+    'm3.blocked': 'Mac を保護するため“Pika Clean”がブロックされました。',
+    'm4.body': 'これを許可するにはパスワードを入力してください。', 'm4.ok': 'OK',
+    'd.title': '「壊れているため開けません」と出たら',
+    'd.lead': 'アプリは壊れていません。ダウンロードした未署名アプリに macOS がかける制限です。「ターミナル」でコマンドを 1 行実行すれば解除できます。',
+    'd.s1': 'Pika Clean が「アプリケーション」フォルダにあることを確認します（ステップ 1）。',
+    'd.s2': '「ターミナル」を開きます：⌘ スペースを押し、「ターミナル」と入力して Return。',
+    'd.s3': '下の「コピー」を押し、ターミナルに貼り付けて（⌘V）Return。',
+    'd.s4': '「アプリケーション」から Pika Clean をもう一度開きます。まだブロックされる場合は、上のステップ 3・4 を繰り返してください。',
+    'd.copy': 'コピー', 'd.copied': 'コピーしました ✓',
+    'd.tip': 'このコマンドは macOS がダウンロードファイルに付ける隔離フラグを外すだけで、アプリ本体は変更しません。実行後に何も表示されないのは正常です。',
+    'end.title': 'それでも開けない場合', 'end.lead': 'よくある質問を確認するか、macOS のバージョンと表示のスクリーンショットを添えて GitHub で Issue を作成してください。',
+    'end.faq': 'よくある質問を見る',
+    'foot': 'macOS 専用 · Windows 版なし · GPLv3 オープンソース',
+  },
+  ko: {
+    'meta.title': 'Pika Clean 설치 · 첫 실행 설정',
+    'nav.home': '홈', 'nav.install': '설치 안내', 'nav.faq': '자주 묻는 질문', 'nav.download': 'Mac용 다운로드',
+    'i.tag': '설치 안내 · 한 번만 설정',
+    'i.title': '첫 실행이 macOS에 막혔나요? 이렇게 하세요',
+    'i.sub': 'Pika Clean은 아직 Apple Developer ID로 서명되지 않아 처음 실행할 때 macOS가 막습니다. 아래 4단계로 한 번만 허용하면 그다음부터는 바로 열립니다.',
+    's1.t': 'Pika Clean을 “응용 프로그램”으로 드래그',
+    's1.d': '다운로드한 dmg를 열고 Pika Clean 아이콘을 “응용 프로그램” 폴더로 드래그한 뒤, “응용 프로그램”에서 더블클릭해 한 번 엽니다.',
+    's2.t': '차단되면 “완료” 클릭',
+    's2.d': '앱을 확인할 수 없다는 안내가 나오는 것은 정상입니다. “완료”를 눌러 닫으세요. “휴지통으로 이동”은 누르지 마세요.',
+    's3.t': '“개인정보 보호 및 보안”에서 “그래도 열기”',
+    's3.d': '“시스템 설정 → 개인정보 보호 및 보안”을 열고 맨 아래 “보안” 항목까지 스크롤하면 Pika Clean이 차단되었다는 안내가 보입니다. 옆의 “그래도 열기”를 누르세요.',
+    's3.tip': '안내가 안 보이나요? 1단계로 돌아가 다시 열고, 차단된 직후 여기를 확인하세요.',
+    's4.t': '로그인 암호 입력, 끝',
+    's4.d': '확인 창이 한 번 더 뜨면 다시 “그래도 열기”를 누르고 Mac 로그인 암호를 입력합니다. Pika Clean이 실행되며 다시 묻지 않습니다.',
+    'm.apps': '응용 프로그램', 'm.settings': '시스템 설정', 'm.privacy': '개인정보 보호 및 보안', 'm.open': '그래도 열기',
+    'm2.title': '“Pika Clean”이(가) 열리지 않음', 'm2.body': 'Apple은 “Pika Clean”에 악성 코드가 없음을 확인할 수 없습니다.', 'm2.done': '완료', 'm2.trash': '휴지통으로 이동',
+    'm3.general': '일반', 'm3.appearance': '화면 모드', 'm3.desktop': '데스크탑 및 Dock', 'm3.security': '보안',
+    'm3.blocked': 'Mac을 보호하기 위해 “Pika Clean”이(가) 차단되었습니다.',
+    'm4.body': '이 작업을 허용하려면 암호를 입력하십시오.', 'm4.ok': '확인',
+    'd.title': '“손상되었기 때문에 열 수 없습니다”라고 나오면',
+    'd.lead': '앱이 실제로 손상된 것은 아닙니다. 다운로드한 미서명 앱에 macOS가 거는 제한입니다. “터미널”에서 명령 한 줄로 풀 수 있습니다.',
+    'd.s1': 'Pika Clean이 “응용 프로그램” 폴더에 있는지 확인합니다(1단계).',
+    'd.s2': '“터미널”을 엽니다: ⌘ 스페이스를 누르고 “터미널”을 입력한 뒤 Return.',
+    'd.s3': '아래 “복사”를 누르고 터미널에 붙여 넣은 뒤(⌘V) Return.',
+    'd.s4': '“응용 프로그램”에서 Pika Clean을 다시 엽니다. 여전히 막히면 위의 3·4단계를 다시 하세요.',
+    'd.copy': '복사', 'd.copied': '복사됨 ✓',
+    'd.tip': '이 명령은 macOS가 다운로드한 파일에 붙이는 격리 표시만 지우며 앱 자체는 바꾸지 않습니다. 실행 후 아무 출력이 없는 것이 정상입니다.',
+    'end.title': '그래도 열리지 않나요?', 'end.lead': '자주 묻는 질문을 확인하거나, macOS 버전과 안내 화면 스크린샷을 첨부해 GitHub에 Issue를 남겨 주세요.',
+    'end.faq': '자주 묻는 질문 보기',
+    'foot': 'macOS 전용 · Windows 버전 없음 · GPLv3 오픈 소스',
+  },
+};
+const HTML_LANG = { zh: 'zh-CN', 'zh-Hant': 'zh-Hant', en: 'en', ja: 'ja', ko: 'ko' };
+let lang;
+
+// 与首页相同的语言检测：?lang= → localStorage → 浏览器语言
+function detect() {
+  const q = new URLSearchParams(location.search).get('lang');
+  if (T[q]) return q;
+  try { const s = localStorage.getItem('lang'); if (T[s]) return s; } catch {}
+  for (const l of navigator.languages || [navigator.language]) {
+    const x = l.toLowerCase();
+    if (/^zh-(tw|hk|mo|hant)/.test(x)) return 'zh-Hant';
+    if (x.startsWith('zh')) return 'zh';
+    if (x.startsWith('ja')) return 'ja';
+    if (x.startsWith('ko')) return 'ko';
+    if (x.startsWith('en')) return 'en';
+  }
+  return 'en';
+}
+
+function apply(l) {
+  lang = l;
+  const d = T[l];
+  document.documentElement.lang = HTML_LANG[l];
+  document.title = d['meta.title'];
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = d[el.dataset.i18n]; });
+  document.getElementById('lang').value = l;
+}
+
+document.querySelectorAll('.dl').forEach(a => a.href = 'index.html');
+document.querySelectorAll('.gh').forEach(a => a.href = REPO);
+const sel = document.getElementById('lang');
+sel.addEventListener('change', () => {
+  try { localStorage.setItem('lang', sel.value); } catch {}
+  apply(sel.value);
+});
+apply(detect());
+
+const copyBtn = document.getElementById('copy');
+copyBtn.addEventListener('click', async () => {
+  const text = document.getElementById('cmd').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  copyBtn.textContent = T[lang]['d.copied'];
+  setTimeout(() => { copyBtn.textContent = T[lang]['d.copy']; }, 1600);
+});
+</script>
+</body>
+</html>

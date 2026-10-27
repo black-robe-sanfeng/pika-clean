@@ -24,11 +24,14 @@ TAURI_SIGNING_PRIVATE_KEY ?= $(HOME)/.tauri/pikaclean_updater.key
 # 打包产物统一放在这里，每次打包前清空，只留这一次的
 ARTIFACTS := release-artifacts
 
-# 打包 mac 安装包，把 .dmg 和自动更新用的 .app.tar.gz（带签名）复制到 release-artifacts/
+# 打包 mac 安装包（universal：一个包同时含 Intel 和 Apple 芯片两份代码），把 .dmg 和自动更新用的 .app.tar.gz（带签名）复制到 release-artifacts/
+# 需要两个 Rust 目标，缺了先装上；产物在 backend/target/universal-apple-darwin/ 下
+BUNDLE := backend/target/universal-apple-darwin/release/bundle
 package: frontend/node_modules
+	rustup target add aarch64-apple-darwin x86_64-apple-darwin
 	rm -rf $(ARTIFACTS) && mkdir -p $(ARTIFACTS)
-	TAURI_SIGNING_PRIVATE_KEY="$(TAURI_SIGNING_PRIVATE_KEY)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" APPLE_SIGNING_IDENTITY="$(APPLE_SIGNING_IDENTITY)" $(TAURI) build
-	cp backend/target/release/bundle/dmg/*.dmg backend/target/release/bundle/macos/*.app.tar.gz* $(ARTIFACTS)/
+	TAURI_SIGNING_PRIVATE_KEY="$(TAURI_SIGNING_PRIVATE_KEY)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" APPLE_SIGNING_IDENTITY="$(APPLE_SIGNING_IDENTITY)" $(TAURI) build --target universal-apple-darwin
+	cp $(BUNDLE)/dmg/*.dmg $(BUNDLE)/macos/*.app.tar.gz* $(ARTIFACTS)/
 	@echo "安装包："
 	@ls $(ARTIFACTS)/*.dmg
 
