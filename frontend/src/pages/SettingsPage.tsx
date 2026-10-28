@@ -236,7 +236,7 @@ export function SettingsPage({ active }: { active: boolean }) {
             <span>{t('菜单栏显示')}</span>
             <small>{t('在菜单栏图标旁边用文字显示用量')}</small>
           </span>
-          {(['cpu', 'mem', 'disk'] as const).map((k) => (
+          {(['cpu', 'mem', 'disk', 'net'] as const).map((k) => (
             <label key={k} className="chk-inline">
               <input
                 type="checkbox"
@@ -244,7 +244,7 @@ export function SettingsPage({ active }: { active: boolean }) {
                 disabled={!s}
                 onChange={(e) => s && api.menubarSet({ ...s.menubar, [k]: e.target.checked }).then(reload)}
               />
-              {k === 'cpu' ? 'CPU' : k === 'mem' ? t('内存') : t('磁盘')}
+              {k === 'cpu' ? 'CPU' : k === 'mem' ? t('内存') : k === 'disk' ? t('磁盘') : t('网速')}
             </label>
           ))}
         </div>
@@ -254,6 +254,20 @@ export function SettingsPage({ active }: { active: boolean }) {
             <small>{t('可用空间不足一成时发一条系统通知，每天最多一次')}</small>
           </span>
           <input className="sw" type="checkbox" checked={s?.low_disk_alert ?? true} disabled={!s} onChange={(e) => api.lowDiskAlertSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
+            <span>{t('每周提醒清理')}</span>
+            <small>{t('缓存、日志和废纸篓超过 2 GB 时发一条系统通知，只提醒不删除')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.clean_reminder ?? true} disabled={!s} onChange={(e) => api.cleanReminderSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
+            <span>{t('快捷键打开主窗口')}</span>
+            <small>{t('在任何地方按 ⌃⌥P 打开 Pika Clean')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.hotkey ?? false} disabled={!s} onChange={(e) => api.hotkeySet(e.target.checked).then(reload, (err) => toast(String(err)))} />
         </label>
         <label className="row">
           <span className="grow">

@@ -30,12 +30,18 @@ const AI_TOOLS: [string, string][] = [
   ['/.gemini/', 'Gemini CLI'],
   ['/Cursor/', 'Cursor'],
 ];
+const BROWSERS: [string, string][] = [
+  ['/Google/Chrome/', 'Chrome'],
+  ['/Microsoft Edge/', 'Edge'],
+  ['/Brave-Browser/', 'Brave'],
+];
 const itemName = (cat: CategoryId, path: string) => {
   const tail = (n: number) => path.split('/').slice(-n).join('/');
   if (cat === 'ai_cache' || cat === 'ai_history') {
     const tool = AI_TOOLS.find(([k]) => path.includes(k))?.[1];
     return tool ? `${tool} · ${tail(cat === 'ai_history' ? 2 : 1)}` : tail(2);
   }
+  if (cat === 'browser_privacy') return `${BROWSERS.find(([k]) => path.includes(k))?.[1] ?? 'Safari'} · ${baseName(path)}`;
   return cat === 'stale_projects' || cat === 'dev_cache' ? tail(2) : baseName(path);
 };
 
@@ -616,6 +622,7 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
             {chosen.some((x) => x.c.removal === 'trash') && t('移到废纸篓的内容要清空废纸篓后才释放空间。')}
             {chosen.some((x) => x.c.needs_admin) && t('系统缓存和崩溃转储需要管理员权限，点「清理」后系统会弹出密码框，密码由系统处理。')}
             {chosen.some((x) => x.c.id === 'ai_cache') && t('AI 工具开着时清理它的缓存，可能打断它正在做的事，建议先退出。')}
+            {chosen.some((x) => x.c.id === 'browser_privacy') && t('清理浏览器记录前先退出对应的浏览器，清理后各网站要重新登录。')}
             {dev.chosen.length > 0 && t('用 Docker 和 Xcode 自己的命令清理，删除的内容无法恢复。')}
             {dev.chosen.some((r) => r.target.kind === 'docker_stopped_containers') && t('已停止容器里写过的数据会一起删掉。')}
           </p>

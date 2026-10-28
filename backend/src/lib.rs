@@ -23,6 +23,7 @@ pub mod system;
 #[cfg(feature = "selftest")]
 mod selftest;
 mod tray;
+pub mod updates;
 
 use tauri::{ActivationPolicy, AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 
@@ -54,6 +55,7 @@ fn daily_housekeeping(app: &AppHandle, snap: &model::Snapshot, last_alert_day: &
         // 记不下来就算了，不打扰用户；当天重启时 record_usage 自己会跳过已经记过的
         let _ = db::record_usage(&dir, today, snap.disk.used_bytes, snap.disk.total_bytes);
         *last_usage_day = Some(today);
+        clean_reminder(app, &dir, snap.ts_ms);
     }
     // 先看磁盘是不是真快满了、今天提醒过没有，是才去读设置文件：绝大多数时候一次都不用读
     if !db::should_alert_low_disk(snap.disk.used_bytes, snap.disk.total_bytes, false, *last_alert_day, today) {
@@ -66,6 +68,36 @@ fn daily_housekeeping(app: &AppHandle, snap: &model::Snapshot, last_alert_day: &
         let _ = app.notification().builder().title(i18n::t("磁盘空间快用完了")).body(i18n::t("只剩 {0} GB 可用。打开 Pika Clean 清理一下？").replace("{0}", &format!("{free_gb:.0}"))).show();
         *last_alert_day = Some(today);
     }
+}
+
+/// 每周看一次缓存、日志、废纸篓攒了多少，超过 2 GB 发一条通知。只提醒，不删东西。
+/// 扫描放到单独的线程里，不耽误采样。
+fn clean_reminder(app: &AppHandle, dir: &std::path::Path, now_ms: u64) {
+    let mut settings = db::load_settings(dir);
+    if settings.clean_reminder_ms == 0 {
+        settings.clean_reminder_ms = now_ms;
+        let _ = db::save_settings(dir, &settings);
+        return;
+    }
+    if !db::should_check_clean(now_ms, settings.clean_reminder_ms, settings.mute_clean_reminder) {
+        return;
+    }
+    // ponytail: 读改写设置文件和界面改设置之间没加锁，一周一次，撞上的概率可以忽略
+    settings.clean_reminder_ms = now_ms;
+    let _ = db::save_settings(dir, &settings);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        use tauri_plugin_notification::NotificationExt;
+        let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
+        // 只看一键清理默认会清、又不用输密码的几类：缓存、日志、废纸篓
+        let rules: Vec<_> = scan::default_rules(&home).into_iter().filter(|r| r.default_selected && !r.needs_admin).collect();
+        let report = scan::scan(&rules, std::time::SystemTime::now(), &scan::spotlight_recent, &|_| {}, &std::sync::atomic::AtomicBool::new(false));
+        let bytes: u64 = report.categories.iter().map(|c| c.total_bytes).sum();
+        if bytes >= db::CLEAN_REMINDER_BYTES {
+            let gb = format!("{:.1}", bytes as f64 / 1_073_741_824.0);
+            let _ = app.notification().builder().title(i18n::t("可以清理一下了")).body(i18n::t("缓存、日志和废纸篓攒了 {0} GB。打开 Pika Clean 一键清理？").replace("{0}", &gb)).show();
+        }
+    });
 }
 
 /// 后台采样：把每份快照存起来，并发给看得见的窗口。
@@ -112,6 +144,15 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _, event| {
+                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        tray::show_main(app, None);
+                    }
+                })
+                .build(),
+        )
         .manage(commands::Latest::default())
         .manage(commands::LastScan::default())
         .manage(system::Awake::default())
@@ -165,6 +206,8 @@ pub fn run() {
             commands::apps_orphans,
             commands::apps_trash_orphans,
             commands::app_reveal,
+            commands::app_open,
+            commands::apps_updates,
             commands::ai_explain_uninstall,
             commands::login_items,
             commands::login_item_set,
@@ -187,7 +230,9 @@ pub fn run() {
             commands::ai_organize_downloads,
             commands::onboarded_set,
             commands::low_disk_alert_set,
+            commands::clean_reminder_set,
             commands::menubar_set,
+            commands::hotkey_set,
             commands::item_reveal,
             commands::space_start,
             commands::space_cancel,
@@ -218,7 +263,10 @@ pub fn run() {
             i18n::set(i18n::resolve(language.as_deref()));
             tray::init(app.handle())?;
             if let Ok(dir) = app.path().app_data_dir() {
-                tray::set_menubar(db::load_settings(&dir).menubar);
+                let settings = db::load_settings(&dir);
+                tray::set_menubar(settings.menubar);
+                // 被别的软件占着就算了，设置里再打开时会把原因告诉用户
+                let _ = tray::set_hotkey(app.handle(), settings.hotkey);
             }
             // 带 --hidden 启动（开机自启）时只留菜单栏，主窗口等第一次打开时再建（配置里 create 为 false）
             if !std::env::args().any(|a| a == "--hidden") {

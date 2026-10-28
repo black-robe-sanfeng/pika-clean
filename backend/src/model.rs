@@ -204,6 +204,8 @@ pub enum CategoryId {
     Duplicates,
     /// 个人文件夹里的大文件和很久没打开的文件
     LargeFiles,
+    /// 浏览器的浏览记录和 Cookie（Safari、Chrome、Edge、Brave）。删了会退出各网站的登录：默认不勾选，只进废纸篓
+    BrowserPrivacy,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]

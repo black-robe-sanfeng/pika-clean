@@ -139,6 +139,43 @@ impl Stop<'_> {
 }
 
 /// iPhone、iPad 系统固件（`.ipsw`）的下载位置（相对用户主目录）。
+/// 浏览器的浏览记录和 Cookie 文件（相对主目录），连同 SQLite 的日志文件一起：只删主文件留下日志，下次打开可能把旧记录写回去。
+/// 缓存不在这里，已经归「应用缓存」。Firefox 的配置目录名是随机的，没列。
+pub const BROWSER_PRIVACY_FILES: [&str; 18] = [
+    "Library/Safari/History.db",
+    "Library/Safari/History.db-wal",
+    "Library/Safari/History.db-shm",
+    "Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies",
+    "Library/Application Support/Google/Chrome/Default/History",
+    "Library/Application Support/Google/Chrome/Default/History-journal",
+    "Library/Application Support/Google/Chrome/Default/Cookies",
+    "Library/Application Support/Google/Chrome/Default/Cookies-journal",
+    "Library/Application Support/Google/Chrome/Default/Network/Cookies",
+    "Library/Application Support/Google/Chrome/Default/Network/Cookies-journal",
+    "Library/Application Support/Microsoft Edge/Default/History",
+    "Library/Application Support/Microsoft Edge/Default/History-journal",
+    "Library/Application Support/Microsoft Edge/Default/Cookies",
+    "Library/Application Support/Microsoft Edge/Default/Cookies-journal",
+    "Library/Application Support/BraveSoftware/Brave-Browser/Default/History",
+    "Library/Application Support/BraveSoftware/Brave-Browser/Default/History-journal",
+    "Library/Application Support/BraveSoftware/Brave-Browser/Default/Cookies",
+    "Library/Application Support/BraveSoftware/Brave-Browser/Default/Cookies-journal",
+];
+
+/// 这些文件属于哪个浏览器（进程名），清理前要它退出。
+pub fn browser_of(path: &Path) -> &'static str {
+    let p = path.to_string_lossy();
+    if p.contains("/Google/Chrome/") {
+        "Google Chrome"
+    } else if p.contains("/Microsoft Edge/") {
+        "Microsoft Edge"
+    } else if p.contains("/Brave-Browser/") {
+        "Brave Browser"
+    } else {
+        "Safari"
+    }
+}
+
 pub const IOS_FIRMWARE_DIRS: [&str; 2] = ["Library/iTunes/iPhone Software Updates", "Library/iTunes/iPad Software Updates"];
 
 /// Homebrew 的安装位置（Apple 芯片、Intel），用第一个装了的。
@@ -431,6 +468,7 @@ impl CategoryId {
             Self::HomebrewOld => "homebrew_old",
             Self::Duplicates => "duplicates",
             Self::LargeFiles => "large_files",
+            Self::BrowserPrivacy => "browser_privacy",
         }
     }
 }
@@ -476,6 +514,8 @@ pub fn default_rules(home: &Path) -> Vec<Rule> {
         Rule { default_selected: false, needs_full_disk_access: true, ..rule(CategoryId::MailDownloads, home.join("Library/Containers/com.apple.mail/Data/Library/Mail Downloads")) },
         // 只列 brew 自己认为可以删的旧版本；默认不勾选
         Rule { default_selected: false, ..rule(CategoryId::HomebrewOld, brew_cellar()) },
+        // 删了会退出各网站的登录：默认不勾选，只进废纸篓。Safari 的记录要完全磁盘访问才读得到，读不到的文件不列
+        Rule { default_selected: false, only: &BROWSER_PRIVACY_FILES, ..rule(CategoryId::BrowserPrivacy, home.to_path_buf()) },
         // 下面两类是个人文件：默认不勾选，只移到废纸篓。放在最后，前面各类已经列过的文件不再重复列
         Rule { default_selected: false, ..rule(CategoryId::Duplicates, home.to_path_buf()) },
         Rule { default_selected: false, ..rule(CategoryId::LargeFiles, home.to_path_buf()) },
@@ -596,11 +636,11 @@ fn scan_category(rule: &Rule, now: SystemTime, recent: &dyn Fn(&Path, u64) -> Ha
         return cat;
     }
     if !rule.only.is_empty() {
-        // 固定路径的类别：只看规则里写明的那几个目录，存在且不是符号链接才算
+        // 固定路径的类别：只看规则里写明的那几个目录（浏览器隐私是文件），存在且不是符号链接才算
         for rel in rule.only {
             let path = rule.root.join(rel);
             let Ok(meta) = path.symlink_metadata() else { continue };
-            if !meta.is_dir() {
+            if !(meta.is_dir() || rule.id == CategoryId::BrowserPrivacy && meta.is_file()) {
                 continue;
             }
             let (size_bytes, done) = measure(&path, meta.dev(), Some(&stop.within(ONLY_ITEM_BUDGET)));
@@ -956,6 +996,23 @@ mod tests {
         assert_eq!(names, [".npm/_cacache", ".gradle/caches"]);
         assert!(!c.partial && !c.default_selected && c.total_bytes >= 50_000);
         assert_eq!(c.only.len(), 5);
+    }
+
+    #[test]
+    fn 浏览器隐私只列写明的记录和_cookie_文件() {
+        let t = TempTree::new();
+        let chrome = "Library/Application Support/Google/Chrome/Default";
+        t.file(&format!("{chrome}/History"), 3_000);
+        t.file(&format!("{chrome}/Cookies"), 1_000);
+        t.file(&format!("{chrome}/Bookmarks"), 10);
+        t.file(&format!("{chrome}/Login Data"), 10);
+        let r = default_rules(&t.0).into_iter().find(|r| r.id == CategoryId::BrowserPrivacy).unwrap();
+        let c = run(&[r]).categories.remove(0);
+        let mut names: Vec<String> = c.items.iter().map(|i| i.path.strip_prefix(&t.0).unwrap().display().to_string()).collect();
+        names.sort();
+        assert_eq!(names, [format!("{chrome}/Cookies"), format!("{chrome}/History")], "书签和密码不碰");
+        assert!(!c.default_selected && c.removal == crate::remove::Mode::Trash);
+        assert_eq!(browser_of(&c.items[0].path), "Google Chrome");
     }
 
     #[test]

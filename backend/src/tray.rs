@@ -153,7 +153,7 @@ pub fn init(app: &AppHandle) -> tauri::Result<()> {
 }
 
 /// 菜单栏要显示的项（`MenubarShow` 的三个开关），每轮采样都要读，放内存里不去读设置文件。
-static MENUBAR: Mutex<crate::db::MenubarShow> = Mutex::new(crate::db::MenubarShow { cpu: false, mem: false, disk: false });
+static MENUBAR: Mutex<crate::db::MenubarShow> = Mutex::new(crate::db::MenubarShow { cpu: false, mem: false, disk: false, net: false });
 /// 上一次设到菜单栏上的文字。没变就不设，免得每轮采样都重画菜单栏。
 static LAST_TITLE: Mutex<String> = Mutex::new(String::new());
 
@@ -174,7 +174,17 @@ fn title(show: crate::db::MenubarShow, snap: &crate::model::Snapshot) -> String 
     if show.disk {
         parts.push(format!("{} {}%", t("磁盘"), pct(snap.disk.used_bytes, snap.disk.total_bytes)));
     }
+    if show.net {
+        parts.push(format!("↓ {}", rate(snap.net.down_bps)));
+        parts.push(format!("↑ {}", rate(snap.net.up_bps)));
+    }
     parts.join("  ")
+}
+
+/// 网速写短：不到 1 MB/s 用整数 K，否则一位小数的 M，菜单栏放得下。
+fn rate(bps: u64) -> String {
+    const MB: u64 = 1024 * 1024;
+    if bps >= MB { format!("{:.1}M", bps as f64 / MB as f64) } else { format!("{}K", bps / 1024) }
 }
 
 pub fn update_title(app: &AppHandle, snap: &crate::model::Snapshot) {
@@ -229,6 +239,23 @@ fn styled_title(button: &objc2_app_kit::NSStatusBarButton, text: &str) {
         title.appendAttributedString(&segment(value, &value_font, &value_color));
     }
     button.setAttributedTitle(&title);
+}
+
+/// 打开主窗口的全局快捷键：⌃⌥P。
+pub fn hotkey() -> tauri_plugin_global_shortcut::Shortcut {
+    use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP)
+}
+
+/// 按设置注册或取消全局快捷键。被别的软件占用时注册会失败，把原因交给调用方。
+pub fn set_hotkey(app: &AppHandle, on: bool) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    let gs = app.global_shortcut();
+    match (on, gs.is_registered(hotkey())) {
+        (true, false) => gs.register(hotkey()).map_err(|e| e.to_string()),
+        (false, true) => gs.unregister(hotkey()).map_err(|e| e.to_string()),
+        _ => Ok(()),
+    }
 }
 
 /// 主窗口和面板都收起来，程序坞图标也去掉，只留菜单栏图标。
@@ -296,7 +323,9 @@ mod tests {
         (snap.mem.used_bytes, snap.mem.total_bytes) = (63, 100);
         (snap.disk.used_bytes, snap.disk.total_bytes) = (71, 0);
         assert_eq!(title(MenubarShow::default(), &snap), "");
-        assert_eq!(title(MenubarShow { cpu: true, mem: true, disk: false }, &snap), "CPU 12%  内存 63%");
-        assert_eq!(title(MenubarShow { cpu: false, mem: false, disk: true }, &snap), "磁盘 0%", "容量读不到时不除以零");
+        assert_eq!(title(MenubarShow { cpu: true, mem: true, ..Default::default() }, &snap), "CPU 12%  内存 63%");
+        assert_eq!(title(MenubarShow { disk: true, ..Default::default() }, &snap), "磁盘 0%", "容量读不到时不除以零");
+        (snap.net.down_bps, snap.net.up_bps) = (5 * 1024 * 1024 + 600 * 1024, 1500);
+        assert_eq!(title(MenubarShow { net: true, ..Default::default() }, &snap), "↓ 5.6M  ↑ 1K");
     }
 }

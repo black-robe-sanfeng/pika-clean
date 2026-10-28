@@ -62,3 +62,6 @@ sed -i '' 's/-aarch64\.dmg/-universal.dmg/' website/index.html
 echo "已发布 $V"
 echo "新用户下载：$BASE/$DMG"
 echo "官网 website/index.html 的版本号已改成 $V，记得 make website 重新部署官网"
+# GitHub 上的 Release 不归这个脚本管（代码要先同步到公开仓库），最后一步手动建
+echo "代码同步到 GitHub 之后，建 Release："
+echo "  cp \"$DIR\"/*.dmg /tmp/$DMG && gh release create v$V --target main --title \"Pika Clean $V\" --notes \"…\" /tmp/$DMG"

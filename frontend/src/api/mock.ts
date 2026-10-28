@@ -229,7 +229,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'update_check':
       return null;
     case 'settings_get':
-      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, menubar: { cpu: true, mem: false, disk: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
+      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, clean_reminder: true, hotkey: false, menubar: { cpu: true, mem: false, disk: false, net: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
     case 'autostart_set':
       return args!.on;
     case 'ai_claude_set':
@@ -276,7 +276,10 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
       return undefined;
     case 'item_reveal':
     case 'app_reveal':
+    case 'app_open':
       return undefined;
+    case 'apps_updates':
+      return new Promise((r) => setTimeout(() => r([{ id: '/Applications/Surge.app', name: 'Surge', current: '6.4.4', latest: '6.10.0' }]), 800));
     case 'ai_organize_downloads':
       if (!consented) return Promise.reject({ kind: 'consent_required' });
       return new Promise((resolve) =>
@@ -295,6 +298,8 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
       );
     case 'onboarded_set':
     case 'low_disk_alert_set':
+    case 'clean_reminder_set':
+    case 'hotkey_set':
     case 'menubar_set':
       return undefined;
     case 'ai_diagnose':

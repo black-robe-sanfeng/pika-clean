@@ -42,12 +42,18 @@ pub struct Settings {
     pub onboarded: bool,
     /// 关掉「磁盘快满时提醒」。默认提醒，所以存的是「关掉」
     pub mute_low_disk_alert: bool,
+    /// 关掉「每周提醒清理」。默认提醒
+    pub mute_clean_reminder: bool,
+    /// 上次检查要不要提醒清理的时间（毫秒）；0 表示还没开始算，第一次见到时只记下时间、不提醒
+    pub clean_reminder_ms: u64,
     /// 界面语言的代号（见 `i18n::Lang::code`）；不填就跟随系统
     pub language: Option<String>,
     /// 用户点了「不再提示」的条目路径：扫描时照样列出，但不再默认勾选
     pub ignored: Vec<String>,
     /// 菜单栏图标旁边用文字显示哪几项（规格 O-06）。默认都不显示，只有图标
     pub menubar: MenubarShow,
+    /// 全局快捷键 ⌃⌥P 打开主窗口。默认关：免得和别的软件抢快捷键
+    pub hotkey: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq)]
@@ -56,6 +62,8 @@ pub struct MenubarShow {
     pub cpu: bool,
     pub mem: bool,
     pub disk: bool,
+    /// 下载和上传速度
+    pub net: bool,
 }
 
 pub fn load_settings(dir: &Path) -> Settings {
@@ -109,6 +117,16 @@ pub const LOW_DISK_FREE_RATIO: f64 = 0.10;
 pub fn should_alert_low_disk(used: u64, total: u64, muted: bool, last_alert_day: Option<u64>, today: u64) -> bool {
     let low = total > 0 && (total.saturating_sub(used) as f64) < total as f64 * LOW_DISK_FREE_RATIO;
     low && !muted && last_alert_day != Some(today)
+}
+
+/// 每周最多提醒一次清理。
+pub const CLEAN_REMINDER_MS: u64 = 7 * 86_400_000;
+/// 缓存、日志、废纸篓加起来超过这么多才提醒。
+pub const CLEAN_REMINDER_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+/// 现在该不该检查一次「可以清理多少」：没关提醒，且距上次检查满一周。刚装上（还没记过时间）不检查。
+pub fn should_check_clean(now_ms: u64, last_ms: u64, muted: bool) -> bool {
+    !muted && last_ms != 0 && now_ms.saturating_sub(last_ms) >= CLEAN_REMINDER_MS
 }
 
 /// 几个命令可能同时写清理记录（比如连点两下）：串行写，免得两行交错写坏。
@@ -302,6 +320,15 @@ mod tests {
         std::fs::write(t.0.join(JOURNAL), "{\"kind\":\"clean\",\"freed_bytes\":5,\"ts_ms\":10}\n{\"kind\":\"clean\",\"freed_bytes\":7,\"ts_ms\":20}\n").unwrap();
         assert_eq!(journal_summary_since(&t.0, 15).cleaned_bytes, 7);
         assert_eq!(journal_summary(&t.0).cleaned_bytes, 12);
+    }
+
+    #[test]
+    fn 每周最多检查一次清理_刚装上不提醒() {
+        let week = CLEAN_REMINDER_MS;
+        assert!(!should_check_clean(5 * week, 0, false), "第一次只记时间");
+        assert!(!should_check_clean(5 * week, 5 * week - 1, false));
+        assert!(should_check_clean(5 * week, 4 * week, false));
+        assert!(!should_check_clean(5 * week, 4 * week, true), "关了提醒");
     }
 
     #[test]

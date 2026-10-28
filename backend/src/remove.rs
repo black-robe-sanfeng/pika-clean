@@ -31,7 +31,16 @@ pub fn mode_of(id: CategoryId) -> Mode {
         // 个人文件和项目目录只进废纸篓（规格 D-12）
         CategoryId::OldDownloads | CategoryId::StaleProjects | CategoryId::AiHistory => Mode::Trash,
         CategoryId::IosBackups | CategoryId::XcodeArchives | CategoryId::MailDownloads | CategoryId::Duplicates | CategoryId::LargeFiles => Mode::Trash,
+        CategoryId::BrowserPrivacy => Mode::Trash,
     }
+}
+
+/// 有没有叫这个名字的进程在运行。
+// ponytail: 每个条目查一次进程表，浏览器隐私最多十几项，不缓存
+fn process_running(name: &str) -> bool {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::nothing());
+    sys.processes().values().any(|p| p.name() == name)
 }
 
 /// 守卫：通过才允许动这个条目。返回 Err 时带上给用户看的原因。
@@ -50,9 +59,13 @@ fn guard(cat: &Category, item: &Item) -> Result<(), String> {
         // 对话记录有的是单个文件（一次会话一个 .jsonl）；大文件和重复文件只认普通文件；其余类别只认目录
         let kind_ok = match cat.id {
             CategoryId::AiHistory => meta.is_dir() || meta.is_file(),
-            CategoryId::Duplicates | CategoryId::LargeFiles => meta.is_file(),
+            CategoryId::Duplicates | CategoryId::LargeFiles | CategoryId::BrowserPrivacy => meta.is_file(),
             _ => meta.is_dir(),
         };
+        // 浏览器开着时挪走它的记录文件，它会继续往已挪走的文件里写，下次打开又是旧记录
+        if cat.id == CategoryId::BrowserPrivacy && listed && process_running(crate::scan::browser_of(&item.path)) {
+            return Err(t("先退出 {0} 再清理").replace("{0}", crate::scan::browser_of(&item.path)));
+        }
         return if listed && kind_ok && real != root && real.starts_with(&root) {
             Ok(())
         } else {

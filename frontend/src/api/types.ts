@@ -85,7 +85,8 @@ export type CategoryId =
   | 'mail_downloads'
   | 'homebrew_old'
   | 'duplicates'
-  | 'large_files';
+  | 'large_files'
+  | 'browser_privacy';
 
 export interface Item {
   /** 条目编号。删除时只传它，不传路径。 */
@@ -278,6 +279,7 @@ export interface MenubarShow {
   cpu: boolean;
   mem: boolean;
   disk: boolean;
+  net: boolean;
 }
 
 export interface SettingsView {
@@ -294,6 +296,10 @@ export interface SettingsView {
   api_key_set: boolean;
   onboarded: boolean;
   low_disk_alert: boolean;
+  /** 每周提醒清理 */
+  clean_reminder: boolean;
+  /** 全局快捷键 ⌃⌥P 打开主窗口 */
+  hotkey: boolean;
   /** 菜单栏图标旁边用文字显示哪几项 */
   menubar: MenubarShow;
   full_disk_access: boolean;
@@ -412,4 +418,12 @@ export interface UsageTrend {
   bytes_per_day: number;
   /** 用量在涨时，照这个速度还有几天写满 */
   days_to_full: number | null;
+}
+
+/** 有新版本的应用（只查用 Sparkle 自动更新的） */
+export interface AppUpdate {
+  id: string;
+  name: string;
+  current: string;
+  latest: string;
 }

@@ -651,6 +651,23 @@ pub async fn app_reveal(app: AppHandle, id: String) -> Result<(), String> {
     .await
 }
 
+/// 打开一个应用（让它自己的更新程序接手）。只认列表里有的。
+#[tauri::command]
+pub async fn app_open(app: AppHandle, id: String) -> Result<(), String> {
+    blocking(move || {
+        let path = app.state::<LastApps>().0.lock().unwrap().iter().find(|a| a.id == id).map(|a| a.path.clone()).ok_or(t("应用不在列表里"))?;
+        open(&[path.as_os_str()])
+    })
+    .await
+}
+
+/// 查列表里用 Sparkle 自动更新的应用有没有新版本。要联网，通常几秒。
+#[tauri::command(async)]
+pub fn apps_updates(last: State<LastApps>) -> Vec<crate::updates::AppUpdate> {
+    let apps = last.0.lock().unwrap().clone();
+    crate::updates::check(&apps)
+}
+
 #[tauri::command(async)]
 pub fn apps_uninstall(app: AppHandle, last: State<LastApps>, ids: Vec<String>, dry_run: bool) -> Result<RemoveResult, String> {
     let known = last.0.lock().unwrap().clone();
@@ -806,6 +823,8 @@ pub struct SettingsView {
     pub api_key_set: bool,
     pub onboarded: bool,
     pub low_disk_alert: bool,
+    pub clean_reminder: bool,
+    pub hotkey: bool,
     pub menubar: db::MenubarShow,
     pub full_disk_access: bool,
     pub version: String,
@@ -834,6 +853,8 @@ pub fn settings_get(app: AppHandle) -> SettingsView {
         api_key_set: crate::keychain::exists(),
         onboarded: stored.onboarded,
         low_disk_alert: !stored.mute_low_disk_alert,
+        clean_reminder: !stored.mute_clean_reminder,
+        hotkey: stored.hotkey,
         menubar: stored.menubar,
         full_disk_access: permissions::has_full_disk_access(),
         version: app.package_info().version.to_string(),
@@ -904,6 +925,21 @@ pub fn ai_organize_downloads(app: AppHandle, last: State<LastScan>, fresh: Optio
 pub fn onboarded_set(app: AppHandle) -> Result<(), String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     db::save_settings(&dir, &db::Settings { onboarded: true, ..db::load_settings(&dir) }).map_err(|e| e.to_string())
+}
+
+/// 开关全局快捷键 ⌃⌥P。先注册成功再存设置：被别的软件占用时报错，设置不变。
+#[tauri::command]
+pub fn hotkey_set(app: AppHandle, on: bool) -> Result<(), String> {
+    crate::tray::set_hotkey(&app, on).map_err(|e| crate::i18n::t("快捷键被别的软件占用了：{0}").replace("{0}", &e))?;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    db::save_settings(&dir, &db::Settings { hotkey: on, ..db::load_settings(&dir) }).map_err(|e| e.to_string())
+}
+
+/// 开关「每周提醒清理」。
+#[tauri::command]
+pub fn clean_reminder_set(app: AppHandle, on: bool) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    db::save_settings(&dir, &db::Settings { mute_clean_reminder: !on, ..db::load_settings(&dir) }).map_err(|e| e.to_string())
 }
 
 /// 开关「磁盘快满时提醒」。

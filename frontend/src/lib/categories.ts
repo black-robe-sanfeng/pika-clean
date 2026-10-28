@@ -20,6 +20,7 @@ export const CATEGORY: Record<CategoryId, { name: string; desc: string; icon: Ic
   mail_downloads: { name: t('邮件附件'), desc: t('「邮件」打开附件时存下的副本，原件仍在邮件里'), icon: 'doc', color: 'c-teal' },
   homebrew_old: { name: t('Homebrew 旧版本'), desc: t('升级后留下的旧版本，只列出 brew cleanup 认为可以删的'), icon: 'cube', color: 'c-orange' },
   duplicates: { name: t('重复文件'), desc: t('下载、桌面、文稿里内容完全相同的文件，每组留一份，其余列在这里'), icon: 'doc', color: 'c-orange' },
+  browser_privacy: { name: t('浏览器记录和 Cookie'), desc: t('Safari、Chrome、Edge、Brave 的浏览记录和 Cookie，删了会退出各网站的登录；书签和密码不动'), icon: 'chat', color: 'c-indigo' },
   large_files: { name: t('大文件和旧文件'), desc: t('个人文件夹里超过 50 MB，或一年没打开且超过 10 MB 的文件'), icon: 'doc', color: 'c-red' },
 };
 

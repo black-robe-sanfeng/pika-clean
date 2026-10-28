@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { api, revealMenu, type AppInfo, type Leftover, type RemoveResult, type UninstallProgress, useAiAvailable } from '../api';
+import { api, revealMenu, type AppInfo, type AppUpdate, type Leftover, type RemoveResult, type UninstallProgress, useAiAvailable } from '../api';
 import { AiAnswer } from '../components/AiAnswer';
 import { Dialog } from '../components/Dialog';
 import { Icon } from '../components/Icon';
@@ -48,6 +48,16 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
   const [orphanPicked, setOrphanPicked] = useState<Set<string>>(new Set());
   const [orphanConfirming, setOrphanConfirming] = useState(false);
   const ai = useAiAvailable();
+  // 有新版本的应用：null 表示还没查过
+  const [updates, setUpdates] = useState<AppUpdate[] | null>(null);
+  const [checking, setChecking] = useState(false);
+  const checkUpdates = () => {
+    setChecking(true);
+    api
+      .appsUpdates()
+      .then(setUpdates, (e) => toast(String(e)))
+      .finally(() => setChecking(false));
+  };
 
   const lastLoad = useRef(0);
   const load = () => {
@@ -230,6 +240,35 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
               )}
             </Fragment>
           ))}
+        </div>
+
+        <div className="gh">{t('软件更新')}</div>
+        <div className="group plain">
+          {updates == null || checking ? (
+            <button className="row" onClick={checkUpdates} disabled={checking || apps == null}>
+              <span className="grow">
+                <span>{checking ? t('正在检查…') : t('检查哪些应用有新版本')}</span>
+                <small>{t('只查自带自动更新（Sparkle）的应用，会连接各应用自己的更新地址。App Store 的应用请在 App Store 里更新。')}</small>
+              </span>
+              <Icon name="chev" className="chev" />
+            </button>
+          ) : updates.length === 0 ? (
+            <div className="row">
+              <span className="grow">{t('都是最新版本')}</span>
+            </div>
+          ) : (
+            updates.map((u) => (
+              <div className="row" key={u.id}>
+                <span className="grow">
+                  <span>{u.name}</span>
+                  <small>{t('{0} → {1}', u.current, u.latest)}</small>
+                </span>
+                <button className="btn gray sm" onClick={() => api.appOpen(u.id).catch((e) => toast(String(e)))}>
+                  {t('打开更新')}
+                </button>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="gh">{t('已删除应用的残留')}</div>

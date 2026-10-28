@@ -3,7 +3,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Lang } from '../lib/i18n.ts';
-import type { AdminTask, AiBackend, Answer, AppInfo, CareReport, ClaudeModel, CleanProgress, DevEnvReport, DevTarget, DeviceInfo, DockMode, Effort, JournalSummary, MenubarShow, Leftover, LoginItem, LoginItems, Organized, Passwordless, Plan, Progress, RemoveResult, ScanReport, SettingsView, Snapshot, SpaceProgress, SpaceReport, Trashed, UninstallProgress, UpdateInfo, UsageTrend, WeekReport } from './types';
+import type { AdminTask, AiBackend, Answer, AppInfo, AppUpdate, CareReport, ClaudeModel, CleanProgress, DevEnvReport, DevTarget, DeviceInfo, DockMode, Effort, JournalSummary, MenubarShow, Leftover, LoginItem, LoginItems, Organized, Passwordless, Plan, Progress, RemoveResult, ScanReport, SettingsView, Snapshot, SpaceProgress, SpaceReport, Trashed, UninstallProgress, UpdateInfo, UsageTrend, WeekReport } from './types';
 import { t } from '../lib/i18n.ts';
 
 export type * from './types';
@@ -105,6 +105,8 @@ export const api = {
   appsList: () => call<AppInfo[]>('apps_list'),
   appsMeasure: (id: string) => call<AppInfo>('apps_measure', { id }),
   appReveal: (id: string) => call<void>('app_reveal', { id }),
+  appOpen: (id: string) => call<void>('app_open', { id }),
+  appsUpdates: () => call<AppUpdate[]>('apps_updates'),
   appsUninstall: (ids: string[], dryRun: boolean) => call<RemoveResult>('apps_uninstall', { ids, dryRun }),
   /** 找已删除应用留下的数据，已量好大小 */
   appsOrphans: () => call<Leftover[]>('apps_orphans'),
@@ -147,6 +149,8 @@ export const api = {
   aiOrganizeDownloads: (fresh?: boolean) => call<Organized>('ai_organize_downloads', { fresh }),
   onboardedSet: () => call<void>('onboarded_set'),
   lowDiskAlertSet: (on: boolean) => call<void>('low_disk_alert_set', { on }),
+  hotkeySet: (on: boolean) => call<void>('hotkey_set', { on }),
+  cleanReminderSet: (on: boolean) => call<void>('clean_reminder_set', { on }),
   menubarSet: (menubar: MenubarShow) => call<void>('menubar_set', { menubar }),
   itemReveal: (id: string) => call<void>('item_reveal', { id }),
   aiBackends: () => call<string[]>('ai_backends'),
