@@ -229,7 +229,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'update_check':
       return null;
     case 'settings_get':
-      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, clean_reminder: true, hotkey: false, menubar: { cpu: true, mem: false, disk: false, net: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
+      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, clean_reminder: true, hotkey: false, trash_watch: true, menubar: { cpu: true, mem: false, disk: false, net: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
     case 'autostart_set':
       return args!.on;
     case 'ai_claude_set':
@@ -279,7 +279,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'app_open':
       return undefined;
     case 'apps_updates':
-      return new Promise((r) => setTimeout(() => r([{ id: '/Applications/Surge.app', name: 'Surge', current: '6.4.4', latest: '6.10.0' }]), 800));
+      return new Promise((r) => setTimeout(() => r([{ id: '/Applications/Surge.app', name: 'Surge', current: '6.4.4', latest: '6.10.0', brew: null }, { id: 'brew:calibre', name: 'calibre', current: '7.16.0', latest: '9.17.0', brew: 'brew upgrade --cask calibre' }]), 800));
     case 'ai_organize_downloads':
       if (!consented) return Promise.reject({ kind: 'consent_required' });
       return new Promise((resolve) =>
@@ -300,8 +300,23 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'low_disk_alert_set':
     case 'clean_reminder_set':
     case 'hotkey_set':
+    case 'trash_watch_set':
     case 'menubar_set':
+    case 'plugin_trash':
+    case 'plugin_show':
       return undefined;
+    case 'quick_clean':
+      return new Promise((r) => setTimeout(() => r({ freed_bytes: 1.8 * GB, trashed_bytes: 0, failed: [], estimated: false, trashed: [], warning: null }), 700));
+    case 'trashed_app_pending':
+      return location.hash.includes('trashed') ? { name: 'Slack', paths: ['/Users/demo/Library/Application Support/Slack', '/Users/demo/Library/Caches/com.tinyspeck.slackmacgap'], bytes: 0.32 * GB } : null;
+    case 'trashed_app_clean':
+      return { freed_bytes: 0, trashed_bytes: 0.32 * GB, failed: [], estimated: false, trashed: [], warning: null };
+    case 'plugins_list':
+      return [
+        { path: '/Users/demo/Library/Application Support/Google/Chrome/Default/Extensions/aapocclcgogkmnckokdopfmhonfmgoek', name: 'Google 幻灯片', kind: 'browser', browser: 'Google Chrome', removable: false },
+        { path: '/Library/Input Methods/Sogou.app', name: '搜狗输入法', kind: 'input', browser: null, removable: false },
+        { path: '/Users/demo/Library/QuickLook/QLMarkdown.qlgenerator', name: 'QLMarkdown', kind: 'quicklook', browser: null, removable: true },
+      ];
     case 'ai_diagnose':
       return fakeAi('（预览用的示例回答）内存压力偏高，主要来自浏览器和开发工具，可以关掉不用的标签页；磁盘已用 76%，暂时不影响速度；开机自启的后台项目有两个长期未用，建议在系统设置里关掉。');
     case 'week_report':

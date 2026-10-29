@@ -469,6 +469,7 @@ fn uninstall_with(app: &AppInfo, roots: &Roots, dry_run: bool, trash: &dyn Fn(&P
 }
 
 /// 把已删除应用留下的数据移到废纸篓（规格 D-10、D-12：默认不勾选、标「需确认」、只进废纸篓）。
+/// 也用来清刚拖进废纸篓的应用留下的数据。
 /// `current` 是刚刚重新找出来的名单（[`crate::apps::orphan_paths`]），前端传来的路径只认这里面有的。
 pub fn trash_orphans(paths: &[String], current: &[PathBuf], roots: &Roots) -> RemoveResult {
     trash_orphans_with(paths, current, roots, &trash_real)
@@ -482,7 +483,8 @@ fn trash_orphans_with(paths: &[String], current: &[PathBuf], roots: &Roots, tras
         let path = PathBuf::from(p);
         // 上级目录解析后仍要在资源库之内：防止找完之后被换成了指向别处的链接
         let inside = path.parent().and_then(|p| fs::canonicalize(p).ok()).zip(library.as_ref()).is_some_and(|(p, lib)| p.starts_with(lib));
-        if !current.contains(&path) || !inside || !path.symlink_metadata().is_ok_and(|m| m.is_dir()) {
+        // 链接不跟进去；目录和文件（偏好设置的 plist）都可以
+        if !current.contains(&path) || !inside || !path.symlink_metadata().is_ok_and(|m| !m.file_type().is_symlink()) {
             out.failed.push(Failure { path, reason: t("路径不在允许删除的范围内").into() });
             continue;
         }

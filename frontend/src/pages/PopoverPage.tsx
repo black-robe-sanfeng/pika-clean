@@ -1,5 +1,5 @@
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
-import { type AdminError, api, type DeviceInfo, type JournalSummary, type Proc, type Snapshot, useAiAvailable, useSnapshot } from '../api';
+import { type AdminError, api, type DeviceInfo, type JournalSummary, type Proc, type RemoveResult, type Snapshot, useAiAvailable, useSnapshot } from '../api';
 import { AiAnswer } from '../components/AiAnswer';
 import { Icon, type IconName } from '../components/Icon';
 import { bytes, DISK_WARN_PCT, gb, mem, pct, rate, uptime } from '../lib/fmt';
@@ -359,6 +359,28 @@ export function PopoverPage() {
     return () => document.removeEventListener('visibilitychange', load);
   }, []);
   const score = snap ? health(snap) : null;
+  // 快速清理：先算能腾出多少（checking），算好后（ready）再点一次才真清（busy）；结果和待确认都过几秒复原
+  const [quick, setQuick] = useState('');
+  const [quickBytes, setQuickBytes] = useState(0);
+  useEffect(() => {
+    if (!quick || quick === 'checking' || quick === 'busy') return;
+    const timer = setTimeout(() => setQuick(''), quick === 'ready' ? 8000 : 4000);
+    return () => clearTimeout(timer);
+  }, [quick]);
+  const quickClean = () => {
+    const sum = (r: RemoveResult) => r.freed_bytes + r.trashed_bytes;
+    const fail = (e: unknown) => setQuick(String(e));
+    if (quick === 'ready') {
+      setQuick('busy');
+      api.quickClean(false).then((r) => setQuick(t('已清理 {0}', bytes(sum(r)))), fail);
+      return;
+    }
+    setQuick('checking');
+    api.quickClean(true).then((r) => {
+      setQuickBytes(sum(r));
+      setQuick(sum(r) < 1 << 20 ? t('没什么可清理的') : 'ready');
+    }, fail);
+  };
 
   useEffect(() => {
     api.deviceInfo().then(setDevice);
@@ -421,8 +443,14 @@ export function PopoverPage() {
           >
             {purge === 'busy' ? t('正在释放…') : armed.armed === 'purge' ? t('要输管理员密码，再点一次') : purge || t('释放内存')}
           </button>
-          <button className="btn gray" onClick={() => api.showMain('scan')}>
-            {t('去清理')}
+          <button className="btn gray" disabled={quick === 'checking' || quick === 'busy'} onClick={quickClean} title={t('清掉缓存、日志和废纸篓')}>
+            {quick === 'checking'
+              ? t('正在计算…')
+              : quick === 'busy'
+                ? t('正在清理…')
+                : quick === 'ready'
+                  ? t('清掉 {0}？再点一次', bytes(quickBytes))
+                  : quick || t('快速清理')}
           </button>
           {/* 不指定页面：主窗口停在用户上次看的那页，和菜单栏右键菜单的「打开主窗口」一样 */}
           <button className="btn" onClick={() => api.showMain()}>

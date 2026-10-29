@@ -264,6 +264,13 @@ export function SettingsPage({ active }: { active: boolean }) {
         </label>
         <label className="row">
           <span className="grow">
+            <span>{t('卸载时提示清理残留')}</span>
+            <small>{t('把应用拖进废纸篓后，问你要不要把它留下的偏好设置和缓存一起清掉。需要完全磁盘访问权限')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.trash_watch ?? true} disabled={!s} onChange={(e) => api.trashWatchSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
             <span>{t('快捷键打开主窗口')}</span>
             <small>{t('在任何地方按 ⌃⌥P 打开 Pika Clean')}</small>
           </span>

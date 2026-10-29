@@ -252,6 +252,17 @@ pub fn leftovers_of(roots: &Roots, all: &[Bundle], i: usize) -> (Vec<PathBuf>, V
     (mine, kept)
 }
 
+/// 刚被拖进废纸篓的应用 `app` 留下的数据：（应用名，可以移走的路径）。读不出包标识时返回 None。
+/// 和卸载用同一套规则（[`leftovers_of`]）：别的已装应用也认的一律不算，所以自动更新把旧版移进废纸篓、
+/// 新版还装着时，什么都不会列出来。
+pub fn trashed_leftovers(roots: &Roots, app: &Path) -> Option<(String, Vec<PathBuf>)> {
+    let mut all = installed(roots);
+    all.push(read_bundle(app, &roots.system_library)?);
+    let i = all.len() - 1;
+    let (mine, _) = leftovers_of(roots, &all, i);
+    Some((all[i].name.clone(), mine))
+}
+
 /// 量一个应用的残留文件有多大，整体不超过 `budget`。
 pub fn measure(app: &mut AppInfo, budget: Duration) {
     let deadline = Instant::now() + budget;
@@ -557,6 +568,26 @@ mod tests {
     use super::testutil::fake_app;
     use super::*;
     use crate::scan::testutil::TempTree;
+
+    #[test]
+    fn 拖进废纸篓的应用_只列没有别人认的残留() {
+        let t = TempTree::new();
+        let (app, roots) = fake_app(&t, "Demo", "com.example.demo");
+        t.file("Library/Caches/com.example.demo/c.bin", 50_000);
+        t.file("Library/Preferences/com.example.demo.plist", 100);
+        // 用户把它拖进了废纸篓
+        let trashed = t.0.join(".Trash/Demo.app");
+        std::fs::create_dir_all(trashed.parent().unwrap()).unwrap();
+        std::fs::rename(&app, &trashed).unwrap();
+        let (name, mut paths) = trashed_leftovers(&roots, &trashed).unwrap();
+        paths.sort();
+        assert_eq!(name, "Demo");
+        assert_eq!(paths, vec![t.0.join("Library/Caches/com.example.demo"), t.0.join("Library/Preferences/com.example.demo.plist")]);
+        // 自动更新：旧版进了废纸篓，新版还装着，数据是新版在用的
+        fake_app(&t, "Demo", "com.example.demo");
+        assert_eq!(trashed_leftovers(&roots, &trashed).unwrap().1, Vec::<PathBuf>::new());
+        assert!(trashed_leftovers(&roots, &t.0.join(".Trash/nothing.app")).is_none());
+    }
 
     #[test]
     fn 列出应用及其残留文件() {

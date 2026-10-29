@@ -54,6 +54,8 @@ pub struct Settings {
     pub menubar: MenubarShow,
     /// 全局快捷键 ⌃⌥P 打开主窗口。默认关：免得和别的软件抢快捷键
     pub hotkey: bool,
+    /// 关掉「应用拖进废纸篓时提示清理残留」。默认提示
+    pub mute_trash_watch: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq)]

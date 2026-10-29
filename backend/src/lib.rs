@@ -15,6 +15,7 @@ mod migrate;
 pub mod model;
 pub mod optimize;
 pub mod permissions;
+pub mod plugins;
 pub mod remove;
 pub mod scan;
 pub mod sensors;
@@ -89,13 +90,44 @@ fn clean_reminder(app: &AppHandle, dir: &std::path::Path, now_ms: u64) {
     std::thread::spawn(move || {
         use tauri_plugin_notification::NotificationExt;
         let home = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
-        // 只看一键清理默认会清、又不用输密码的几类：缓存、日志、废纸篓
-        let rules: Vec<_> = scan::default_rules(&home).into_iter().filter(|r| r.default_selected && !r.needs_admin).collect();
-        let report = scan::scan(&rules, std::time::SystemTime::now(), &scan::spotlight_recent, &|_| {}, &std::sync::atomic::AtomicBool::new(false));
+        let report = scan::quick_scan(&home);
         let bytes: u64 = report.categories.iter().map(|c| c.total_bytes).sum();
         if bytes >= db::CLEAN_REMINDER_BYTES {
             let gb = format!("{:.1}", bytes as f64 / 1_073_741_824.0);
             let _ = app.notification().builder().title(i18n::t("可以清理一下了")).body(i18n::t("缓存、日志和废纸篓攒了 {0} GB。打开 Pika Clean 一键清理？").replace("{0}", &gb)).show();
+        }
+    });
+}
+
+/// 每 3 秒看一眼废纸篓：多了应用（用户把它拖了进来），就找它在资源库里留下的数据，有就打开主窗口问要不要一起清掉。
+/// 没有完全磁盘访问权限时读不了废纸篓，什么都不做。
+fn spawn_trash_watch(app: AppHandle) {
+    std::thread::spawn(move || {
+        let trash = std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".Trash");
+        let apps_in = || -> Option<std::collections::HashSet<std::path::PathBuf>> {
+            Some(std::fs::read_dir(&trash).ok()?.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "app")).collect())
+        };
+        // 一开始就在废纸篓里的不算
+        let mut seen = apps_in();
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            let now = apps_in();
+            let new: Vec<_> = match (&seen, &now) {
+                (Some(old), Some(now)) => now.difference(old).cloned().collect(),
+                _ => vec![],
+            };
+            seen = now;
+            let muted = app.path().app_data_dir().map(|d| db::load_settings(&d).mute_trash_watch).unwrap_or(true);
+            if new.is_empty() || muted {
+                continue;
+            }
+            // ponytail: 在本应用里卸载时，应用先进废纸篓、残留随后才移走；等几秒再找，免得把正在移走的也问一遍
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            if let Some(found) = new.iter().find_map(|p| commands::trashed_app(p)) {
+                *app.state::<commands::PendingTrashed>().0.lock().unwrap() = Some(found);
+                tray::show_main(&app, Some("apps"));
+                let _ = app.emit_to("main", "apps:trashed", ());
+            }
         }
     });
 }
@@ -159,6 +191,7 @@ pub fn run() {
         .manage(keyboard::KeyboardLock::default())
         .manage(commands::LastApps::default())
         .manage(commands::LastSpace::default())
+        .manage(commands::PendingTrashed::default())
         .invoke_handler(tauri::generate_handler![
             commands::metrics_latest,
             commands::device_info,
@@ -233,6 +266,13 @@ pub fn run() {
             commands::clean_reminder_set,
             commands::menubar_set,
             commands::hotkey_set,
+            commands::trash_watch_set,
+            commands::trashed_app_pending,
+            commands::trashed_app_clean,
+            commands::quick_clean,
+            commands::plugins_list,
+            commands::plugin_trash,
+            commands::plugin_show,
             commands::item_reveal,
             commands::space_start,
             commands::space_cancel,
@@ -276,6 +316,14 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             tray::intercept_quit(app.handle());
             app.manage(SamplerThread(spawn_sampler(app.handle().clone())));
+            // 自测会卸载自己放的假应用，不要被这里打断
+            #[cfg(feature = "selftest")]
+            let watch = !std::env::args().any(|a| a == "--selftest");
+            #[cfg(not(feature = "selftest"))]
+            let watch = true;
+            if watch {
+                spawn_trash_watch(app.handle().clone());
+            }
             #[cfg(feature = "selftest")]
             selftest::maybe_run(app.handle());
             Ok(())

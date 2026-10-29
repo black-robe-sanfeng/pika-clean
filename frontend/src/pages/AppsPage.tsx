@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { api, revealMenu, type AppInfo, type AppUpdate, type Leftover, type RemoveResult, type UninstallProgress, useAiAvailable } from '../api';
+import { api, revealMenu, type AppInfo, type AppUpdate, type Leftover, type Plugin, type RemoveResult, type UninstallProgress, useAiAvailable } from '../api';
 import { AiAnswer } from '../components/AiAnswer';
 import { Dialog } from '../components/Dialog';
 import { Icon } from '../components/Icon';
 import { toast } from '../components/Toast';
 import { ago, bytes } from '../lib/fmt';
 import { tint } from '../lib/tint';
+import { useArmed } from '../lib/useArmed';
 import { t } from '../lib/i18n.ts';
 
 /** 多久没打开算「不常用」。 */
@@ -248,7 +249,7 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
             <button className="row" onClick={checkUpdates} disabled={checking || apps == null}>
               <span className="grow">
                 <span>{checking ? t('正在检查…') : t('检查哪些应用有新版本')}</span>
-                <small>{t('只查自带自动更新（Sparkle）的应用，会连接各应用自己的更新地址。App Store 的应用请在 App Store 里更新。')}</small>
+                <small>{t('查自带自动更新（Sparkle）的应用和 Homebrew 装的应用，会连接各应用自己的更新地址。App Store 的应用请在 App Store 里更新。')}</small>
               </span>
               <Icon name="chev" className="chev" />
             </button>
@@ -263,9 +264,16 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
                   <span>{u.name}</span>
                   <small>{t('{0} → {1}', u.current, u.latest)}</small>
                 </span>
-                <button className="btn gray sm" onClick={() => api.appOpen(u.id).catch((e) => toast(String(e)))}>
-                  {t('打开更新')}
-                </button>
+                {u.brew ? (
+                  // Homebrew 的要在终端里升级（可能要输密码、要先退出应用），这里只帮着复制命令
+                  <button className="btn gray sm" title={u.brew} onClick={() => navigator.clipboard.writeText(u.brew!).then(() => toast(t('已复制，到「终端」里粘贴运行')), (e) => toast(String(e)))}>
+                    {t('复制升级命令')}
+                  </button>
+                ) : (
+                  <button className="btn gray sm" onClick={() => api.appOpen(u.id).catch((e) => toast(String(e)))}>
+                    {t('打开更新')}
+                  </button>
+                )}
               </div>
             ))
           )}
@@ -309,6 +317,8 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
             </>
           )}
         </div>
+
+        <Plugins />
       </div>
 
       <div className="bar">
@@ -406,6 +416,76 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
           </div>
         </Dialog>
       )}
+    </>
+  );
+}
+
+/** 扩展和插件：用户资源库里的能移到废纸篓（点两次），系统的只在访达里显示，浏览器扩展去浏览器里管。 */
+function Plugins() {
+  const [list, setList] = useState<Plugin[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const armed = useArmed();
+  const load = () => {
+    setLoading(true);
+    api
+      .pluginsList()
+      .then(setList, (e) => toast(String(e)))
+      .finally(() => setLoading(false));
+  };
+  const kinds: Record<Plugin['kind'], string> = {
+    browser: t('浏览器扩展'),
+    input: t('输入法'),
+    internet: t('网页插件'),
+    prefpane: t('偏好设置面板'),
+    quicklook: t('快速查看插件'),
+    saver: t('屏幕保护程序'),
+  };
+  const trash = (p: Plugin) => {
+    if (!armed.press(p.path)) return;
+    api.pluginTrash(p.path).then(() => {
+      toast(t('已移到废纸篓'));
+      load();
+    }, (e) => toast(String(e)));
+  };
+  return (
+    <>
+      <div className="gh">{t('扩展和插件')}</div>
+      <div className="group plain">
+        {list == null ? (
+          <button className="row" onClick={load} disabled={loading}>
+            <span className="grow">
+              <span>{loading ? t('正在查找…') : t('列出扩展和插件')}</span>
+              <small>{t('浏览器扩展、输入法、快速查看插件、偏好设置面板、屏幕保护程序。')}</small>
+            </span>
+            <Icon name="chev" className="chev" />
+          </button>
+        ) : list.length === 0 ? (
+          <div className="row">
+            <span className="grow">{t('没有找到扩展和插件')}</span>
+          </div>
+        ) : (
+          list.map((p) => (
+            <div className="row" key={p.path}>
+              <span className="grow">
+                <span>
+                  {p.name}
+                  <em className="tag">{kinds[p.kind]}</em>
+                </span>
+                <small>{p.browser ?? shortPath(p.path)}</small>
+              </span>
+              {p.removable ? (
+                <button className="btn gray sm" onClick={() => trash(p)}>
+                  {armed.armed === p.path ? t('再点一次确认') : t('移到废纸篓')}
+                </button>
+              ) : (
+                <button className="btn gray sm" onClick={() => api.pluginShow(p.path).catch((e) => toast(String(e)))}>
+                  {p.browser ? t('在浏览器里管理') : t('在访达中显示')}
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </>
   );
 }

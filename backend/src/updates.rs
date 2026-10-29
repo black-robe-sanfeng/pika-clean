@@ -1,6 +1,7 @@
 //! 已装的应用有没有新版本。只看用 Sparkle 自动更新的应用：读它自己写在 Info.plist 里的更新源（SUFeedURL），
 //! 取里面最新的正式版，和装着的版本比。只在用户点「检查更新」时联网，只连应用自己写明的 https 地址。
-// ponytail: 不查 App Store 和 Homebrew 装的应用；App Store 自己会提示，brew 用户习惯 brew upgrade
+//! 再加上 Homebrew 装的图形应用（cask）：问 `brew outdated`，升级要用户自己在终端里跑。
+// ponytail: 不查 App Store（它自己会提示）和 Homebrew 的命令行工具（大多是被依赖的库，列出来太乱）
 
 use crate::model::AppInfo;
 use std::path::Path;
@@ -13,6 +14,8 @@ pub struct AppUpdate {
     pub name: String,
     pub current: String,
     pub latest: String,
+    /// Homebrew 装的：升级用的命令
+    pub brew: Option<String>,
 }
 
 /// 一个更新源最多等这么久。
@@ -78,13 +81,38 @@ fn check_one(app: &AppInfo) -> Option<AppUpdate> {
     let (url, build) = feed_of(&app.path)?;
     let xml = ureq::get(&url).timeout(FEED_TIMEOUT).call().ok()?.into_string().ok()?;
     let latest = update_for(&app.version, &build, latest_in(&xml)?)?;
-    Some(AppUpdate { id: app.id.clone(), name: app.name.clone(), current: app.version.clone(), latest })
+    Some(AppUpdate { id: app.id.clone(), name: app.name.clone(), current: app.version.clone(), latest, brew: None })
+}
+
+/// `brew outdated --json=v2 --cask` 的结果里，固定了版本（pinned）的不算。
+/// 不加 `--greedy`：自己会自动更新的应用 brew 本来就不管，交给上面的 Sparkle 检查。
+pub(crate) fn casks_in(json: &str) -> Vec<AppUpdate> {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return vec![] };
+    let casks = v.get("casks").and_then(|c| c.as_array()).cloned().unwrap_or_default();
+    casks
+        .iter()
+        .filter(|c| !c.get("pinned").and_then(|p| p.as_bool()).unwrap_or(false))
+        .filter_map(|c| {
+            let name = c.get("name")?.as_str()?;
+            let current = c.get("installed_versions")?.as_array()?.last()?.as_str()?;
+            let latest = c.get("current_version")?.as_str()?;
+            Some(AppUpdate { id: format!("brew:{name}"), name: name.into(), current: current.into(), latest: latest.into(), brew: Some(format!("brew upgrade --cask {name}")) })
+        })
+        .collect()
+}
+
+/// 没装 Homebrew 或者跑不起来就是空的。
+fn brew_casks() -> Vec<AppUpdate> {
+    let Some(brew) = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].into_iter().find(|p| Path::new(p).exists()) else { return vec![] };
+    let out = std::process::Command::new(brew).args(["outdated", "--json=v2", "--cask"]).stderr(std::process::Stdio::null()).output();
+    out.map(|o| casks_in(&String::from_utf8_lossy(&o.stdout))).unwrap_or_default()
 }
 
 /// 并发查一遍，按名字排序。连不上、读不懂的更新源直接跳过。
 pub fn check(apps: &[AppInfo]) -> Vec<AppUpdate> {
     let next = AtomicUsize::new(0);
     let mut out: Vec<AppUpdate> = std::thread::scope(|s| {
+        let brew = s.spawn(brew_casks);
         let workers: Vec<_> = (0..WORKERS)
             .map(|_| {
                 s.spawn(|| {
@@ -96,7 +124,9 @@ pub fn check(apps: &[AppInfo]) -> Vec<AppUpdate> {
                 })
             })
             .collect();
-        workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
+        let mut all: Vec<AppUpdate> = workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect();
+        all.extend(brew.join().unwrap_or_default());
+        all
     });
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     out
@@ -120,6 +150,17 @@ mod tests {
         // 只有构建号的更新源
         assert_eq!(update_for("", "41", (None, Some("42".into()))), Some("42".into()));
         assert_eq!(latest_in("<rss></rss>"), None);
+    }
+
+    #[test]
+    fn 读_brew_过期的图形应用() {
+        let json = r#"{"formulae":[{"name":"abseil","installed_versions":["1"],"current_version":"2","pinned":false}],
+            "casks":[{"name":"calibre","installed_versions":["7.16.0"],"current_version":"9.17.0","pinned":false},
+                     {"name":"old","installed_versions":["1"],"current_version":"2","pinned":true}]}"#;
+        let got = casks_in(json);
+        assert_eq!(got.len(), 1, "命令行工具和固定了版本的不算");
+        assert_eq!((got[0].current.as_str(), got[0].latest.as_str(), got[0].brew.as_deref()), ("7.16.0", "9.17.0", Some("brew upgrade --cask calibre")));
+        assert!(casks_in("not json").is_empty());
     }
 
     #[test]

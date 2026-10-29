@@ -1,9 +1,10 @@
 // 前端与后端通信的唯一出口：所有 Tauri 命令和事件都从这里走。接口清单见 docs/api/README.md。
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Lang } from '../lib/i18n.ts';
-import type { AdminTask, AiBackend, Answer, AppInfo, AppUpdate, CareReport, ClaudeModel, CleanProgress, DevEnvReport, DevTarget, DeviceInfo, DockMode, Effort, JournalSummary, MenubarShow, Leftover, LoginItem, LoginItems, Organized, Passwordless, Plan, Progress, RemoveResult, ScanReport, SettingsView, Snapshot, SpaceProgress, SpaceReport, Trashed, UninstallProgress, UpdateInfo, UsageTrend, WeekReport } from './types';
+import type { AdminTask, AiBackend, Answer, AppInfo, AppUpdate, CareReport, ClaudeModel, CleanProgress, DevEnvReport, DevTarget, DeviceInfo, DockMode, Effort, JournalSummary, MenubarShow, Leftover, Plugin, TrashedApp, LoginItem, LoginItems, Organized, Passwordless, Plan, Progress, RemoveResult, ScanReport, SettingsView, Snapshot, SpaceProgress, SpaceReport, Trashed, UninstallProgress, UpdateInfo, UsageTrend, WeekReport } from './types';
 import { t } from '../lib/i18n.ts';
 
 export type * from './types';
@@ -150,6 +151,16 @@ export const api = {
   onboardedSet: () => call<void>('onboarded_set'),
   lowDiskAlertSet: (on: boolean) => call<void>('low_disk_alert_set', { on }),
   hotkeySet: (on: boolean) => call<void>('hotkey_set', { on }),
+  trashWatchSet: (on: boolean) => call<void>('trash_watch_set', { on }),
+  /** 菜单栏的快速清理：缓存、日志、废纸篓。dryRun 时只算能腾出多少 */
+  quickClean: (dryRun: boolean) => call<RemoveResult>('quick_clean', { dryRun }),
+  trashedAppPending: () => call<TrashedApp | null>('trashed_app_pending'),
+  /** clean 为 false 时只是不再问 */
+  trashedAppClean: (clean: boolean) => call<RemoveResult>('trashed_app_clean', { clean }),
+  pluginsList: () => call<Plugin[]>('plugins_list'),
+  pluginTrash: (path: string) => call<void>('plugin_trash', { path }),
+  /** 浏览器扩展打开浏览器的扩展页，其余在访达里显示 */
+  pluginShow: (path: string) => call<void>('plugin_show', { path }),
   cleanReminderSet: (on: boolean) => call<void>('clean_reminder_set', { on }),
   menubarSet: (menubar: MenubarShow) => call<void>('menubar_set', { menubar }),
   itemReveal: (id: string) => call<void>('item_reveal', { id }),
@@ -178,6 +189,17 @@ export const api = {
   onCleanProgress: (cb: (p: CleanProgress) => void) => on<CleanProgress>('clean:progress', cb),
   onUninstallProgress: (cb: (p: UninstallProgress) => void) => on<UninstallProgress>('uninstall:progress', cb),
   onNavigate: (cb: (view: string) => void) => on<string>('nav:go', cb),
+  /** 有应用（.app）被拖到窗口上松手 */
+  onDropApp: (cb: (path: string) => void) => {
+    if (!inTauri) return () => {};
+    const un = getCurrentWebview().onDragDropEvent((e) => {
+      const app = e.payload.type === 'drop' ? e.payload.paths.find((p) => p.endsWith('.app')) : undefined;
+      if (app) cb(app);
+    });
+    return () => void un.then((f) => f());
+  },
+  /** 有应用被拖进了废纸篓、还留下数据：再调 trashedAppPending 取 */
+  onTrashedApp: (cb: () => void) => on<null>('apps:trashed', cb),
   onLanguageChange: (cb: (lang: string) => void) => on<string>('lang:changed', cb),
 };
 

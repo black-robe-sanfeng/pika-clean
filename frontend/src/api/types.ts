@@ -300,6 +300,8 @@ export interface SettingsView {
   clean_reminder: boolean;
   /** 全局快捷键 ⌃⌥P 打开主窗口 */
   hotkey: boolean;
+  /** 应用拖进废纸篓时提示清理残留 */
+  trash_watch: boolean;
   /** 菜单栏图标旁边用文字显示哪几项 */
   menubar: MenubarShow;
   full_disk_access: boolean;
@@ -426,4 +428,24 @@ export interface AppUpdate {
   name: string;
   current: string;
   latest: string;
+  /** Homebrew 装的：升级用的命令 */
+  brew: string | null;
+}
+
+/** 刚拖进废纸篓的应用还留下的数据 */
+export interface TrashedApp {
+  name: string;
+  paths: string[];
+  bytes: number;
+}
+
+/** 扩展和插件 */
+export interface Plugin {
+  path: string;
+  name: string;
+  kind: 'quicklook' | 'prefpane' | 'input' | 'saver' | 'internet' | 'browser';
+  /** 浏览器扩展属于哪个浏览器 */
+  browser: string | null;
+  /** 能直接移到废纸篓 */
+  removable: boolean;
 }

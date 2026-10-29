@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type ScanReport, type UpdateInfo } from '../api';
+import { api, type ScanReport, type TrashedApp, type UpdateInfo } from '../api';
 import { Sidebar, type ViewId, VIEWS } from '../components/Sidebar';
 import { Dialog } from '../components/Dialog';
-import { ToastHost } from '../components/Toast';
+import { toast, ToastHost } from '../components/Toast';
+import { bytes } from '../lib/fmt';
 import { UpdateDialog } from '../components/UpdateDialog';
 import { AppsPage } from '../pages/AppsPage';
 import { CarePage } from '../pages/CarePage';
@@ -64,6 +65,38 @@ export function App() {
   // 菜单栏面板的「去清理」「打开主窗口」会让后端发这个事件
   useEffect(() => api.onNavigate((v) => setView(toView(v))), []);
 
+  // 把应用拖到窗口上：去卸载页，把它的名字填进搜索框（和空间去向的「去卸载」一样，不替用户勾选）
+  useEffect(
+    () =>
+      api.onDropApp((path) => {
+        setJump({ view: 'apps', path });
+        setView('apps');
+      }),
+    [],
+  );
+
+  // 有应用被拖进了废纸篓、还在资源库里留着数据：后端已经把窗口打开到卸载页，这里问要不要一起清掉。
+  // 窗口可能是刚建的、错过了事件，所以打开时也问一次
+  const [trashed, setTrashed] = useState<TrashedApp | null>(null);
+  useEffect(() => {
+    const load = () => api.trashedAppPending().then(setTrashed, () => {});
+    load();
+    return api.onTrashedApp(load);
+  }, []);
+  const [cleaning, setCleaning] = useState(false);
+  const trashedDone = (clean: boolean) => {
+    setCleaning(true);
+    api.trashedAppClean(clean).then(
+      (r) => {
+        if (clean) toast(r.failed.length ? t('已移到废纸篓 {0}，{1} 项没能移走：{2}', bytes(r.trashed_bytes), r.failed.length, r.failed[0].reason) : t('已移到废纸篓 {0}', bytes(r.trashed_bytes)));
+      },
+      (e) => toast(String(e)),
+    ).finally(() => {
+      setCleaning(false);
+      setTrashed(null);
+    });
+  };
+
   return (
     <>
       <div className="drag" data-tauri-drag-region />
@@ -98,6 +131,30 @@ export function App() {
         </main>
       </div>
       {!welcome && update && <UpdateDialog info={update} onClose={() => setUpdate(null)} />}
+      {!welcome && trashed && (
+        <Dialog
+          title={t('「{0}」已移到废纸篓', trashed.name)}
+          actions={
+            <>
+              <button className="btn" disabled={cleaning} onClick={() => trashedDone(true)}>
+                {t('一起移到废纸篓')}
+              </button>
+              <button className="btn gray" disabled={cleaning} onClick={() => trashedDone(false)}>
+                {t('保留')}
+              </button>
+            </>
+          }
+        >
+          <p style={{ margin: 0 }}>{t('它还留下了 {0} 的偏好设置、缓存等数据。一起移到废纸篓吗？', bytes(trashed.bytes))}</p>
+          <div className="group plain" style={{ marginTop: 10 }}>
+            {trashed.paths.map((p) => (
+              <div className="row" key={p}>
+                <small className="grow" style={{ wordBreak: 'break-all' }}>{p.replace(/^\/Users\/[^/]+/, '~')}</small>
+              </div>
+            ))}
+          </div>
+        </Dialog>
+      )}
       {welcome && (
         <Dialog
           title={t('欢迎使用 Pika Clean')}
@@ -131,6 +188,9 @@ export function App() {
                 <span>{t('读废纸篓需要额外授权')}</span>
                 <small style={{ whiteSpace: 'normal' }}>{t('不授权也能用其余功能。需要时在「设置」里点「去授权」。')}</small>
               </span>
+              <button className="btn gray sm" onClick={() => api.openFullDiskAccessSettings().catch((e) => toast(String(e)))}>
+                {t('去授权')}
+              </button>
             </div>
           </div>
         </Dialog>

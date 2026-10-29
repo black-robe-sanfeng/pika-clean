@@ -242,6 +242,26 @@ pub fn remove_items(app: AppHandle, last: State<LastScan>, ids: Vec<String>, dry
     Ok(result)
 }
 
+/// 菜单栏面板的「快速清理」：重新扫一遍缓存、日志、废纸篓，跳过「不再提示」的条目，全部清掉。
+/// `dry_run` 时只算能腾出多少，面板上先给用户看数字、再点一次才真删。
+#[tauri::command(async)]
+pub fn quick_clean(app: AppHandle, dry_run: bool) -> Result<RemoveResult, String> {
+    let _busy = Removing::start(true)?;
+    let ignored = app.path().app_data_dir().map(|d| db::load_settings(&d).ignored).unwrap_or_default();
+    let report = scan::quick_scan(&home());
+    let ids: Vec<String> =
+        report.categories.iter().flat_map(|c| &c.items).filter(|i| !ignored.iter().any(|p| Path::new(p) == i.path)).map(|i| i.id.clone()).collect();
+    let mut result = remove::remove(&ids, &report, &remove::stamps(&report.categories), dry_run, &|_| {}, &CLEAN_CANCEL);
+    if !dry_run {
+        record(&app, &mut result);
+        // 主窗口里的扫描结果已经过时，这几类重扫一遍
+        if app.state::<LastScan>().0.lock().unwrap().is_some() {
+            rescan(&app, &[CategoryId::AppCache, CategoryId::Logs, CategoryId::Trash]);
+        }
+    }
+    Ok(result)
+}
+
 /// 最近一次清理移到废纸篓的条目（原位置和在废纸篓里的位置）。
 #[tauri::command]
 pub fn trash_last(app: AppHandle) -> Vec<Trashed> {
@@ -723,6 +743,100 @@ pub fn apps_trash_orphans(app: AppHandle, paths: Vec<String>) -> Result<RemoveRe
     Ok(r)
 }
 
+/// 刚拖进废纸篓的应用还留下的数据，等用户决定要不要一起清掉（见 `lib.rs` 的 `spawn_trash_watch`）。
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct TrashedApp {
+    pub name: String,
+    /// 显示用
+    pub paths: Vec<String>,
+    pub bytes: u64,
+    #[serde(skip)]
+    real: Vec<PathBuf>,
+}
+
+#[derive(Default)]
+pub struct PendingTrashed(pub Mutex<Option<TrashedApp>>);
+
+/// 废纸篓里的应用 `app` 留下的数据，量好大小；没有就返回 None。
+pub(crate) fn trashed_app(app: &Path) -> Option<TrashedApp> {
+    let (name, real) = apps::trashed_leftovers(&apps::default_roots(&home()), app)?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let bytes = real
+        .iter()
+        .map(|p| {
+            let dev = p.symlink_metadata().map(|m| std::os::unix::fs::MetadataExt::dev(&m)).unwrap_or(0);
+            scan::disk_usage_until(p, dev, Some(deadline)).0
+        })
+        .sum();
+    (!real.is_empty()).then(|| TrashedApp { name, paths: real.iter().map(|p| p.to_string_lossy().into_owned()).collect(), bytes, real })
+}
+
+#[tauri::command]
+pub fn trashed_app_pending(pending: State<PendingTrashed>) -> Option<TrashedApp> {
+    pending.0.lock().unwrap().clone()
+}
+
+/// `clean` 为 true 时把等着的那份残留移到废纸篓，否则只是不再问。只认后端自己找出来的路径。
+#[tauri::command(async)]
+pub fn trashed_app_clean(app: AppHandle, pending: State<PendingTrashed>, clean: bool) -> Result<RemoveResult, String> {
+    let Some(found) = pending.0.lock().unwrap().take() else { return Ok(RemoveResult::default()) };
+    if !clean {
+        return Ok(RemoveResult::default());
+    }
+    let r = remove::trash_orphans(&found.paths, &found.real, &apps::default_roots(&home()));
+    if r.trashed_bytes > 0 {
+        let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let _ = db::append_uninstall(&dir, 0, &r);
+    }
+    Ok(r)
+}
+
+// ---- 扩展和插件 ----
+
+fn plugins_now() -> Vec<crate::plugins::Plugin> {
+    crate::plugins::list(&home(), Path::new("/Library"))
+}
+
+#[tauri::command(async)]
+pub fn plugins_list() -> Vec<crate::plugins::Plugin> {
+    plugins_now()
+}
+
+/// 把用户资源库里的一个插件移到废纸篓。动手前重新列一遍，只认列表里标了能移走的。
+#[tauri::command(async)]
+pub fn plugin_trash(path: String) -> Result<(), String> {
+    if !plugins_now().iter().any(|p| p.path == path && p.removable) {
+        return Err(t("路径不在允许删除的范围内").into());
+    }
+    remove::trash_real(Path::new(&path))
+}
+
+/// 浏览器扩展：打开那个浏览器的扩展管理页；其余的在访达里显示。只认列表里有的。
+#[tauri::command(async)]
+pub fn plugin_show(path: String) -> Result<(), String> {
+    let found = plugins_now().into_iter().find(|p| p.path == path).ok_or(t("路径不在允许删除的范围内"))?;
+    match found.browser {
+        Some(browser) => {
+            let scheme = match browser {
+                "Microsoft Edge" => "edge",
+                "Brave Browser" => "brave",
+                _ => "chrome",
+            };
+            let id = Path::new(&path).file_name().unwrap_or_default().to_string_lossy().into_owned();
+            let url = format!("{scheme}://extensions/?id={id}");
+            open(&["-a".as_ref(), browser.as_ref(), url.as_ref()])
+        }
+        None => open(&["-R".as_ref(), path.as_ref()]),
+    }
+}
+
+/// 开关「应用拖进废纸篓时提示清理残留」。
+#[tauri::command]
+pub fn trash_watch_set(app: AppHandle, on: bool) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    db::save_settings(&dir, &db::Settings { mute_trash_watch: !on, ..db::load_settings(&dir) }).map_err(|e| e.to_string())
+}
+
 #[tauri::command(async)]
 pub fn ai_explain_uninstall(app: AppHandle, last: State<LastApps>, id: String, on_delta: Channel<String>, fresh: Option<bool>) -> Result<Answer, AiError> {
     let known = last.0.lock().unwrap().clone();
@@ -825,6 +939,7 @@ pub struct SettingsView {
     pub low_disk_alert: bool,
     pub clean_reminder: bool,
     pub hotkey: bool,
+    pub trash_watch: bool,
     pub menubar: db::MenubarShow,
     pub full_disk_access: bool,
     pub version: String,
@@ -855,6 +970,7 @@ pub fn settings_get(app: AppHandle) -> SettingsView {
         low_disk_alert: !stored.mute_low_disk_alert,
         clean_reminder: !stored.mute_clean_reminder,
         hotkey: stored.hotkey,
+        trash_watch: !stored.mute_trash_watch,
         menubar: stored.menubar,
         full_disk_access: permissions::has_full_disk_access(),
         version: app.package_info().version.to_string(),

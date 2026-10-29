@@ -515,7 +515,7 @@ pub fn default_rules(home: &Path) -> Vec<Rule> {
         // 只列 brew 自己认为可以删的旧版本；默认不勾选
         Rule { default_selected: false, ..rule(CategoryId::HomebrewOld, brew_cellar()) },
         // 删了会退出各网站的登录：默认不勾选，只进废纸篓。Safari 的记录要完全磁盘访问才读得到，读不到的文件不列
-        Rule { default_selected: false, only: &BROWSER_PRIVACY_FILES, ..rule(CategoryId::BrowserPrivacy, home.to_path_buf()) },
+        Rule { default_selected: false, needs_full_disk_access: true, only: &BROWSER_PRIVACY_FILES, ..rule(CategoryId::BrowserPrivacy, home.to_path_buf()) },
         // 下面两类是个人文件：默认不勾选，只移到废纸篓。放在最后，前面各类已经列过的文件不再重复列
         Rule { default_selected: false, ..rule(CategoryId::Duplicates, home.to_path_buf()) },
         Rule { default_selected: false, ..rule(CategoryId::LargeFiles, home.to_path_buf()) },
@@ -560,6 +560,13 @@ fn measure(path: &Path, dev: u64, stop: Option<&Stop>) -> (u64, bool) {
 
 fn millis(t: SystemTime) -> u64 {
     t.duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// 不用确认就能清的那几类（一键清理默认勾选、又不用输密码的：缓存、日志、废纸篓），重新扫一遍。
+/// 菜单栏的「快速清理」和每周清理提醒用。
+pub fn quick_scan(home: &Path) -> ScanReport {
+    let rules: Vec<Rule> = default_rules(home).into_iter().filter(|r| r.default_selected && !r.needs_admin).collect();
+    scan(&rules, SystemTime::now(), &spotlight_recent, &|_| {}, &std::sync::atomic::AtomicBool::new(false))
 }
 
 /// 向系统的搜索索引问：`root` 下最近 `days` 天内被打开过或新加进来的一级条目有哪些。
