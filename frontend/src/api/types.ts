@@ -86,7 +86,10 @@ export type CategoryId =
   | 'homebrew_old'
   | 'duplicates'
   | 'large_files'
-  | 'browser_privacy';
+  | 'browser_privacy'
+  | 'installers'
+  | 'screenshots'
+  | 'similar_photos';
 
 export interface Item {
   /** 条目编号。删除时只传它，不传路径。 */
@@ -302,6 +305,7 @@ export interface SettingsView {
   hotkey: boolean;
   /** 应用拖进废纸篓时提示清理残留 */
   trash_watch: boolean;
+  runaway_alert: boolean;
   /** 菜单栏图标旁边用文字显示哪几项 */
   menubar: MenubarShow;
   full_disk_access: boolean;
@@ -344,6 +348,16 @@ export interface SpaceReport {
   files: number;
   /** 统计完成的时间（毫秒时间戳）；结果存在磁盘上，重启后还在 */
   scanned_at_ms: number;
+  /** 和至少一天前的那次统计比，涨得最多的几处 */
+  growth: SpaceGrowth[];
+  /** 拿来比的那次统计的时间；没有可比的为 0 */
+  growth_since_ms: number;
+}
+
+export interface SpaceGrowth {
+  path: string;
+  size_bytes: number;
+  delta_bytes: number;
 }
 
 /** 统计中的一个位置：个人文件夹下的一级（如 ~/Library），或个人文件夹以外的一级（如 /Applications） */

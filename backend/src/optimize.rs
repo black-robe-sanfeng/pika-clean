@@ -330,6 +330,51 @@ pub fn add_chosen() -> Result<bool, String> {
     Ok(true)
 }
 
+/// 一个进程连续这么多次（每分钟看一次）都把 CPU 占到 `RUNAWAY_CPU` 以上，就提醒一次。
+pub const RUNAWAY_MINUTES: u32 = 5;
+/// 按单核算的百分比：90 就是快占满一个核。
+pub const RUNAWAY_CPU: f32 = 90.0;
+/// 这些是本来就会长时间跑满的（编译、转码、索引），提醒了也只是打扰。
+const RUNAWAY_EXPECTED: [&str; 8] = ["rustc", "cargo", "clang", "swift-frontend", "ffmpeg", "HandBrakeCLI", "node", "pikaclean"];
+
+/// 读 `ps -co pid=,pcpu=,comm=` 的输出：（进程号，CPU 百分比，名字）。名字里可能有空格。
+pub fn parse_ps(out: &str) -> Vec<(u32, f32, String)> {
+    out.lines()
+        .filter_map(|l| {
+            let mut it = l.split_whitespace();
+            let pid = it.next()?.parse().ok()?;
+            let cpu = it.next()?.parse().ok()?;
+            Some((pid, cpu, it.collect::<Vec<_>>().join(" ")))
+        })
+        .collect()
+}
+
+/// 每分钟调一次：更新每个进程连续占满 CPU 的次数，返回刚好满 `RUNAWAY_MINUTES` 次的（进程号，名字）。
+/// 同一次连续占满只提醒一次；降下来再升上去重新算。
+pub fn runaway_tick(streak: &mut HashMap<u32, u32>, rows: &[(u32, f32, String)]) -> Vec<(u32, String)> {
+    let mut next = HashMap::new();
+    let mut hit = Vec::new();
+    for (pid, cpu, name) in rows {
+        if *cpu < RUNAWAY_CPU || RUNAWAY_EXPECTED.contains(&name.as_str()) {
+            continue;
+        }
+        let n = streak.get(pid).copied().unwrap_or(0) + 1;
+        if n == RUNAWAY_MINUTES {
+            hit.push((*pid, name.clone()));
+        }
+        next.insert(*pid, n);
+    }
+    *streak = next;
+    hit
+}
+
+/// 当前用户自己的进程（系统进程用户结束不了，提醒了也没用），按 CPU 降序。
+pub fn user_processes() -> Vec<(u32, f32, String)> {
+    let uid = unsafe { libc::getuid() }.to_string();
+    let out = Command::new("/bin/ps").args(["-U", &uid, "-co", "pid=,pcpu=,comm="]).output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+    parse_ps(&out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,5 +482,20 @@ mod tests {
         let list = vec![SavedApp { name: "A".into(), path: "/Applications/A.app".into(), hidden: true }];
         save_saved(&t.0, &list).unwrap();
         assert_eq!(load_saved(&t.0), list);
+    }
+
+    #[test]
+    fn 连续五分钟占满_cpu_只提醒一次() {
+        let rows = parse_ps("  264 143.4 Google Chrome Helper\n 900  95.0 rustc\n 77 3.0 Finder\nbad line\n");
+        assert_eq!(rows[0], (264, 143.4, "Google Chrome Helper".into()));
+        assert_eq!(rows.len(), 3);
+        let mut streak = HashMap::new();
+        for _ in 1..RUNAWAY_MINUTES {
+            assert!(runaway_tick(&mut streak, &rows).is_empty());
+        }
+        assert_eq!(runaway_tick(&mut streak, &rows), vec![(264, "Google Chrome Helper".to_string())], "编译器不算");
+        assert!(runaway_tick(&mut streak, &rows).is_empty(), "已经提醒过");
+        runaway_tick(&mut streak, &[(264, 10.0, "Google Chrome Helper".into())]);
+        assert!(streak.is_empty(), "降下来就重新算");
     }
 }

@@ -233,6 +233,15 @@ export function SettingsPage({ active }: { active: boolean }) {
         </div>
         <div className="row">
           <span className="grow">
+            <span>{t('意见反馈')}</span>
+            <small>{t('遇到问题或有想法，到 GitHub 提一个 issue')}</small>
+          </span>
+          <button className="btn gray sm" onClick={() => api.openFeedbackPage().catch((e) => toast(String(e)))}>
+            {t('去反馈')}
+          </button>
+        </div>
+        <div className="row">
+          <span className="grow">
             <span>{t('菜单栏显示')}</span>
             <small>{t('在菜单栏图标旁边用文字显示用量')}</small>
           </span>
@@ -268,6 +277,13 @@ export function SettingsPage({ active }: { active: boolean }) {
             <small>{t('把应用拖进废纸篓后，问你要不要把它留下的偏好设置和缓存一起清掉。需要完全磁盘访问权限')}</small>
           </span>
           <input className="sw" type="checkbox" checked={s?.trash_watch ?? true} disabled={!s} onChange={(e) => api.trashWatchSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
+            <span>{t('进程占满 CPU 时提醒')}</span>
+            <small>{t('某个应用连续 5 分钟以上把 CPU 占满（卡住的网页、跑飞的脚本）时发一条系统通知')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.runaway_alert ?? true} disabled={!s} onChange={(e) => api.runawayAlertSet(e.target.checked).then(reload)} />
         </label>
         <label className="row">
           <span className="grow">

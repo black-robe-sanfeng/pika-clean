@@ -175,6 +175,8 @@ const TABLE: &[(&str, [&str; 4])] = &[
     ("先退出 {0} 再清理", ["先結束 {0} 再清理", "Quit {0} first", "先に {0} を終了してください", "먼저 {0}을(를) 종료하세요"]),
     ("可以清理一下了", ["可以清理一下了", "Time for a cleanup", "そろそろクリーンアップしましょう", "정리할 때가 됐어요"]),
     ("缓存、日志和废纸篓攒了 {0} GB。打开 Pika Clean 一键清理？", ["快取、日誌和垃圾桶累積了 {0} GB。打開 Pika Clean 一鍵清理？", "Caches, logs and Trash add up to {0} GB. Open Pika Clean to clean up?", "キャッシュ・ログ・ゴミ箱が {0} GB たまっています。Pika Clean を開いてクリーンアップしますか？", "캐시, 로그, 휴지통이 {0} GB 쌓였습니다. Pika Clean을 열어 정리할까요?"]),
+    ("{0} 一直占满 CPU", ["{0} 一直佔滿 CPU", "{0} keeps maxing out the CPU", "{0} が CPU を使い続けています", "{0}이(가) CPU를 계속 최대로 쓰고 있어요"]),
+    ("已经连续 {0} 分钟以上，电脑可能变慢、发热。打开 Pika Clean 的「优化速度」看看要不要结束它？", ["已經連續 {0} 分鐘以上，電腦可能變慢、發熱。打開 Pika Clean 的「最佳化速度」看看要不要結束它？", "For over {0} minutes now, which can slow your Mac and heat it up. Open Speed Up in Pika Clean to decide whether to quit it?", "{0} 分以上続いていて、Mac が遅くなったり熱くなったりすることがあります。Pika Clean の「高速化」で終了するか確認しますか？", "{0}분 넘게 이어지고 있어 Mac이 느려지거나 뜨거워질 수 있어요. Pika Clean의 「속도 최적화」에서 종료할지 확인할까요?"]),
     ("磁盘空间快用完了", ["磁碟空間快用完了", "Disk space is running low", "ディスクの空き容量が残りわずかです", "디스크 공간이 거의 없습니다"]),
     ("只剩 {0} GB 可用。打开 Pika Clean 清理一下？", ["只剩 {0} GB 可用。打開 Pika Clean 清理一下？", "Only {0} GB left. Open Pika Clean to free some space?", "残り {0} GB です。Pika Clean を開いてクリーンアップしますか？", "{0} GB만 남았습니다. Pika Clean을 열어 정리할까요?"]),
     ("这一项已经不在开机启动列表里", ["這一項已經不在開機啟動列表裡", "This item is no longer in the login items list", "この項目はログイン項目の一覧にもうありません", "이 항목은 더 이상 로그인 항목 목록에 없습니다"]),

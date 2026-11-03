@@ -100,6 +100,7 @@ export const api = {
   appsQuit: (names: string[]) => call<string[]>('apps_quit', { names }),
   openFullDiskAccessSettings: () => call<void>('open_full_disk_access_settings'),
   openSponsorPage: () => call<void>('open_sponsor_page'),
+  openFeedbackPage: () => call<void>('open_feedback_page'),
   adminRun: (task: AdminTask) => call<void>('admin_run', { task }),
   adminPasswordless: () => call<Passwordless>('admin_passwordless'),
   adminPasswordlessSet: (on: boolean) => call<void>('admin_passwordless_set', { on }),
@@ -152,6 +153,7 @@ export const api = {
   lowDiskAlertSet: (on: boolean) => call<void>('low_disk_alert_set', { on }),
   hotkeySet: (on: boolean) => call<void>('hotkey_set', { on }),
   trashWatchSet: (on: boolean) => call<void>('trash_watch_set', { on }),
+  runawayAlertSet: (on: boolean) => call<void>('runaway_alert_set', { on }),
   /** 菜单栏的快速清理：缓存、日志、废纸篓。dryRun 时只算能腾出多少 */
   quickClean: (dryRun: boolean) => call<RemoveResult>('quick_clean', { dryRun }),
   trashedAppPending: () => call<TrashedApp | null>('trashed_app_pending'),
@@ -178,6 +180,7 @@ export const api = {
   /** 最近 28 天的启动盘用量趋势；记录不足两天时为空 */
   usageTrend: () => call<UsageTrend | null>('usage_trend'),
   aiExplainTrend: (onDelta?: OnDelta, fresh?: boolean) => stream<Answer>('ai_explain_trend', {}, onDelta, fresh),
+  aiCheckup: (onDelta?: OnDelta, fresh?: boolean) => stream<Answer>('ai_checkup', {}, onDelta, fresh),
   onSpaceProgress: (cb: (p: SpaceProgress) => void) => on<SpaceProgress>('space:progress', cb),
   onSpaceDone: (cb: (r: SpaceReport) => void) => on<SpaceReport>('space:done', cb),
   onMetrics: (cb: (s: Snapshot) => void) => on<Snapshot>('metrics:tick', cb),

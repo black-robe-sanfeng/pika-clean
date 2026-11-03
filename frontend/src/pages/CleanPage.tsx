@@ -10,7 +10,7 @@ import { Icon, Tile } from '../components/Icon';
 import { Sheet } from '../components/Sheet';
 import { toast } from '../components/Toast';
 import { CATEGORY, cleanable, cleanableBytes, REMOVAL } from '../lib/categories';
-import { Insights } from './ScanPage';
+import { Insights, SummaryButton, useSummary } from './ScanPage';
 import { ago, bytes } from '../lib/fmt';
 import { t } from '../lib/i18n.ts';
 import { categoryAt, devGroupAt } from '../lib/jump.ts';
@@ -286,6 +286,7 @@ function TrashedSheet({ open, list, onChange, onClose }: { open: boolean; list: 
 /** onRescan：用户点「返回」，回到首页的大按钮。清理后不整份重扫，后端会发来改好的报告 */
 /** focus：从空间去向点「去清理」过来的位置，打开它所在的类别或开发环境那一组 */
 export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan: () => void; focus?: { path: string } | null }) {
+  const summary = useSummary(scan);
   // 重新扫描期间沿用上一份报告，列表不闪
   const last = useRef<ScanReport | null>(null);
   if (scan.phase === 'done') last.current = scan.report;
@@ -465,6 +466,7 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
       <div className="scroll hasbar">
         <h1 className="title-row">
           {scanning ? t('正在扫描…') : t('扫描完成')}
+          {!scanning && total > 0 && <SummaryButton summary={summary} show={summary.show} />}
           <button className="btn sm" disabled={scanning || busy} onClick={onRescan}>
             {t('返回')}
           </button>
@@ -479,7 +481,7 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
               : t('发现 {0} 可清理空间{1}', bytes(total), defaultBytes < total ? t('，其中 {0} 已默认勾选', bytes(defaultBytes)) : '')}
           {!scanning && report?.at_ms ? ` · ${t('扫描于 {0}', new Date(report.at_ms).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}` : ''}
         </p>
-        <Insights scan={scan} summary={!scanning && total > 0} />
+        <Insights open={summary.open} />
         <Storage cleanBytes={total} />
         {ai && (
           <AskClean

@@ -30,7 +30,7 @@ pub fn mode_of(id: CategoryId) -> Mode {
         CategoryId::IosFirmware | CategoryId::HomebrewOld => Mode::Permanent,
         // 个人文件和项目目录只进废纸篓（规格 D-12）
         CategoryId::OldDownloads | CategoryId::StaleProjects | CategoryId::AiHistory => Mode::Trash,
-        CategoryId::IosBackups | CategoryId::XcodeArchives | CategoryId::MailDownloads | CategoryId::Duplicates | CategoryId::LargeFiles => Mode::Trash,
+        CategoryId::IosBackups | CategoryId::XcodeArchives | CategoryId::MailDownloads | CategoryId::Duplicates | CategoryId::LargeFiles | CategoryId::Installers | CategoryId::Screenshots | CategoryId::SimilarPhotos => Mode::Trash,
         CategoryId::BrowserPrivacy => Mode::Trash,
     }
 }
@@ -59,7 +59,7 @@ fn guard(cat: &Category, item: &Item) -> Result<(), String> {
         // 对话记录有的是单个文件（一次会话一个 .jsonl）；大文件和重复文件只认普通文件；其余类别只认目录
         let kind_ok = match cat.id {
             CategoryId::AiHistory => meta.is_dir() || meta.is_file(),
-            CategoryId::Duplicates | CategoryId::LargeFiles | CategoryId::BrowserPrivacy => meta.is_file(),
+            CategoryId::Duplicates | CategoryId::LargeFiles | CategoryId::BrowserPrivacy | CategoryId::Installers | CategoryId::Screenshots | CategoryId::SimilarPhotos => meta.is_file(),
             _ => meta.is_dir(),
         };
         // 浏览器开着时挪走它的记录文件，它会继续往已挪走的文件里写，下次打开又是旧记录

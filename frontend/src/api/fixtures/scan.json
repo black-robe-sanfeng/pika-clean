@@ -53,6 +53,32 @@
       "unreadable": false
     },
     {
+      "id": "installers",
+      "root": "/Users/demo",
+      "total_bytes": 419430400,
+      "items": [
+        {
+          "id": "installers:/Users/demo/Downloads/GoogleChrome.dmg",
+          "path": "/Users/demo/Downloads/GoogleChrome.dmg",
+          "size_bytes": 230686720,
+          "last_used_ms": 1791887001612,
+          "partial": false
+        },
+        {
+          "id": "installers:/Users/demo/Downloads/Slack-4.41.dmg",
+          "path": "/Users/demo/Downloads/Slack-4.41.dmg",
+          "size_bytes": 188743680,
+          "last_used_ms": 1791887001612,
+          "partial": false
+        }
+      ],
+      "default_selected": false,
+      "removal": "trash",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false
+    },
+    {
       "id": "old_downloads",
       "root": "/Users/demo/Downloads",
       "total_bytes": 5324800,
@@ -182,6 +208,32 @@
         ".claude/projects/-Users-demo-code-web/5b1c.jsonl",
         ".codex/sessions/2026/08/02"
       ]
+    },
+    {
+      "id": "screenshots",
+      "root": "/Users/demo",
+      "total_bytes": 443547648,
+      "items": [
+        {
+          "id": "screenshots:/Users/demo/Desktop/截屏2026-08-01 10.12.03.png",
+          "path": "/Users/demo/Desktop/截屏2026-08-01 10.12.03.png",
+          "size_bytes": 3145728,
+          "last_used_ms": 1791887001612,
+          "partial": false
+        },
+        {
+          "id": "screenshots:/Users/demo/Desktop/录屏2026-07-20 15.00.11.mov",
+          "path": "/Users/demo/Desktop/录屏2026-07-20 15.00.11.mov",
+          "size_bytes": 440401920,
+          "last_used_ms": 1791887001612,
+          "partial": false
+        }
+      ],
+      "default_selected": false,
+      "removal": "trash",
+      "needs_admin": false,
+      "needs_full_disk_access": false,
+      "unreadable": false
     }
   ]
 }

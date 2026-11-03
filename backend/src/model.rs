@@ -206,6 +206,12 @@ pub enum CategoryId {
     LargeFiles,
     /// 浏览器的浏览记录和 Cookie（Safari、Chrome、Edge、Brave）。删了会退出各网站的登录：默认不勾选，只进废纸篓
     BrowserPrivacy,
+    /// 「下载」里的安装包（.dmg、.pkg、.zip），对应的应用已经装好了
+    Installers,
+    /// 桌面（或截屏保存位置）上一个月前的截图和录屏
+    Screenshots,
+    /// 几乎一样的照片（连拍、重复导出）：每组留最大的一张，其余列出来
+    SimilarPhotos,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]

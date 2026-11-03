@@ -16,6 +16,7 @@ pub mod model;
 pub mod optimize;
 pub mod permissions;
 pub mod plugins;
+pub mod similar;
 pub mod remove;
 pub mod scan;
 pub mod sensors;
@@ -132,6 +133,30 @@ fn spawn_trash_watch(app: AppHandle) {
     });
 }
 
+/// 每分钟看一眼当前用户的进程：哪个连续 5 分钟把 CPU 占满（卡死的网页、跑飞的脚本），发一条通知。
+/// 用 `ps` 而不是采样线程的进程列表：窗口都收起来时采样线程不刷新进程。
+fn spawn_runaway_watch(app: AppHandle) {
+    std::thread::spawn(move || {
+        use tauri_plugin_notification::NotificationExt;
+        let mut streak = std::collections::HashMap::new();
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            let hits = optimize::runaway_tick(&mut streak, &optimize::user_processes());
+            if hits.is_empty() || app.path().app_data_dir().map(|d| db::load_settings(&d).mute_runaway).unwrap_or(true) {
+                continue;
+            }
+            for (_, name) in hits {
+                let _ = app
+                    .notification()
+                    .builder()
+                    .title(i18n::t("{0} 一直占满 CPU").replace("{0}", &name))
+                    .body(i18n::t("已经连续 {0} 分钟以上，电脑可能变慢、发热。打开 Pika Clean 的「优化速度」看看要不要结束它？").replace("{0}", &optimize::RUNAWAY_MINUTES.to_string()))
+                    .show();
+            }
+        }
+    });
+}
+
 /// 后台采样：把每份快照存起来，并发给看得见的窗口。
 fn spawn_sampler(app: AppHandle) -> std::thread::Thread {
     let handle = std::thread::spawn(move || {
@@ -230,6 +255,7 @@ pub fn run() {
             commands::apps_quit,
             commands::open_full_disk_access_settings,
             commands::open_sponsor_page,
+            commands::open_feedback_page,
             commands::admin_run,
             commands::admin_passwordless,
             commands::admin_passwordless_set,
@@ -267,6 +293,8 @@ pub fn run() {
             commands::menubar_set,
             commands::hotkey_set,
             commands::trash_watch_set,
+            commands::runaway_alert_set,
+            commands::ai_checkup,
             commands::trashed_app_pending,
             commands::trashed_app_clean,
             commands::quick_clean,
@@ -323,6 +351,7 @@ pub fn run() {
             let watch = true;
             if watch {
                 spawn_trash_watch(app.handle().clone());
+                spawn_runaway_watch(app.handle().clone());
             }
             #[cfg(feature = "selftest")]
             selftest::maybe_run(app.handle());

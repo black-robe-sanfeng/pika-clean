@@ -267,6 +267,25 @@ export function SpacePage({ active, onGo }: { active: boolean; onGo: (view: 'sca
           {t('取消')}
         </button>
       )}
+      {report && atTop && !running && report.growth?.length > 0 && (
+        <>
+          <div className="gh">{t('最近 {0} 天涨得最多', Math.max(1, Math.round((report.scanned_at_ms - report.growth_since_ms) / 86_400_000)))}</div>
+          <div className="group">
+            {report.growth.map((g) => (
+              <div className="row" key={g.path}>
+                <span className="grow">
+                  <span>{g.path.split('/').pop()}</span>
+                  <small>{g.path.replace(/^\/Users\/[^/]+/, '~')}</small>
+                </span>
+                <span className="num" style={{ color: 'var(--orange)' }}>+{bytes(g.delta_bytes)}</span>
+                <button className="link" style={{ fontSize: 12 }} onClick={() => reveal(g.path)}>
+                  {t('在访达中显示')}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {report && here && (
         <>
           <div className="crumbs">

@@ -209,8 +209,13 @@ button.row{width:100%;text-align:left}
 .aib{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--purple);background:color-mix(in srgb,var(--purple) 14%,transparent)}
 .aib:hover{background:color-mix(in srgb,var(--purple) 28%,transparent)}
 .aib svg{width:15px;height:15px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:16px;background:var(--card);color:var(--purple);font-size:13px;font-weight:600;white-space:nowrap;box-shadow:0 0 0 .5px var(--sep)}
-.pill svg{width:14px;height:14px}
+/* AI 功能的入口按钮：纯色平面、白字。--pc 是按钮色，主题里换成各自的强调色 */
+.pill{--pc:var(--purple);display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border-radius:17px;background:var(--pc);color:#fff;font-size:14px;font-weight:600;letter-spacing:0;white-space:nowrap}
+.pill:hover{filter:brightness(1.08)}
+.pill svg{width:15px;height:15px}
+h1.title-row .pill{margin-left:auto;height:28px;padding:0 13px;border-radius:14px;font-size:13px}
+h1.title-row .pill svg{width:13px;height:13px}
+h1.title-row .pill+.btn{margin-left:0}
 .aicard{display:flex;gap:10px;max-width:598px;padding:12px 14px;border-radius:14px;text-align:left;font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--purple) 10%,var(--card))}
 .aicard svg{flex:none;width:18px;height:18px;margin-top:2px;color:var(--purple)}
 /* 空间统计中边数边显示的位置列表 */
@@ -357,6 +362,8 @@ color-scheme:light;--win:var(--theme-paper);--label:var(--theme-ink);--sub:var(-
 :root[data-theme]:not([data-theme=original]) .window .btn.red{background:var(--red);color:#fff}
 :root[data-theme]:not([data-theme=original]) .window :is(.link,.pill,.aib,.sh-hd svg,.aicard svg,.asks button:hover,.dd-item.on::before){color:var(--theme-accent)}
 :root[data-theme]:not([data-theme=original]) .window .spin{border-top-color:var(--theme-accent)}
+/* 上面那条统一设强调色的规则里有 `.asks button:hover`，优先级高，这里写两遍 .pill 压过它 */
+:root[data-theme]:not([data-theme=original]) .window button.pill.pill{--pc:var(--theme-accent);color:#fff;border-radius:9px}
 :root[data-theme]:not([data-theme=original]) .window :focus-visible{outline-color:var(--theme-accent)}
 :root[data-theme]:not([data-theme=original]) .window .ck{border-color:var(--theme-muted)}
 :root[data-theme]:not([data-theme=original]) .window .ck:checked{border-color:var(--theme-accent);background-color:var(--theme-accent);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E")}

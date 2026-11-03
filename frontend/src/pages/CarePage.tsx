@@ -1,5 +1,7 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { api, type CareReport, type Hog } from '../api';
+import { api, type CareReport, type Hog, useAiAvailable } from '../api';
+import { AiAnswer } from '../components/AiAnswer';
+import { Icon } from '../components/Icon';
 import { toast } from '../components/Toast';
 import { bytes, pct } from '../lib/fmt';
 import { tint } from '../lib/tint';
@@ -120,6 +122,8 @@ function HogList({ list, label, reload }: { list: Hog[]; label?: (h: Hog) => str
 
 export function CarePage({ active }: { active: boolean }) {
   const [r, setR] = useState<CareReport | null>(null);
+  const ai = useAiAvailable();
+  const [checkup, setCheckup] = useState(false);
   // 和优化页一样：切回来时距上次读超过 30 秒就重读
   const last = useRef(0);
   const load = () => {
@@ -132,8 +136,22 @@ export function CarePage({ active }: { active: boolean }) {
 
   return (
     <div className="scroll care">
-      <h1>{t('保养 Mac')}</h1>
+      <h1 className="title-row">
+        {t('保养 Mac')}
+        {/* 点开后按钮还在，再点一次收起 */}
+        {ai && (
+          <button className="pill" onClick={() => setCheckup(!checkup)} aria-expanded={checkup}>
+            <Icon name="scan" />
+            {t('AI 本月体检')}
+          </button>
+        )}
+      </h1>
       <p>{t('看看电池和硬盘的寿命，找出最耗电、写盘最多的应用')}</p>
+      {checkup && (
+        <div className="insights">
+          <AiAnswer ask={api.aiCheckup} />
+        </div>
+      )}
       {!r ? (
         <div className="group" data-empty={t('正在读取…')} />
       ) : (

@@ -600,6 +600,12 @@ pub async fn open_sponsor_page() -> Result<(), String> {
     blocking(|| open(&["https://afdian.com/a/black-robe-sanfeng".as_ref()])).await
 }
 
+/// 用默认浏览器打开 GitHub 上新建 issue 的页面。地址同样写死在这里。
+#[tauri::command]
+pub async fn open_feedback_page() -> Result<(), String> {
+    blocking(|| open(&["https://github.com/black-robe-sanfeng/pika-clean/issues/new".as_ref()])).await
+}
+
 /// 免密授权的状态：开没开，以及开了之后哪些任务不再问密码。
 #[derive(serde::Serialize)]
 pub struct Passwordless {
@@ -830,6 +836,13 @@ pub fn plugin_show(path: String) -> Result<(), String> {
     }
 }
 
+/// 开关「进程连续几分钟占满 CPU 时提醒」。
+#[tauri::command]
+pub fn runaway_alert_set(app: AppHandle, on: bool) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    db::save_settings(&dir, &db::Settings { mute_runaway: !on, ..db::load_settings(&dir) }).map_err(|e| e.to_string())
+}
+
 /// 开关「应用拖进废纸篓时提示清理残留」。
 #[tauri::command]
 pub fn trash_watch_set(app: AppHandle, on: bool) -> Result<(), String> {
@@ -940,6 +953,7 @@ pub struct SettingsView {
     pub clean_reminder: bool,
     pub hotkey: bool,
     pub trash_watch: bool,
+    pub runaway_alert: bool,
     pub menubar: db::MenubarShow,
     pub full_disk_access: bool,
     pub version: String,
@@ -971,6 +985,7 @@ pub fn settings_get(app: AppHandle) -> SettingsView {
         clean_reminder: !stored.mute_clean_reminder,
         hotkey: stored.hotkey,
         trash_watch: !stored.mute_trash_watch,
+        runaway_alert: !stored.mute_runaway,
         menubar: stored.menubar,
         full_disk_access: permissions::has_full_disk_access(),
         version: app.package_info().version.to_string(),
@@ -1104,6 +1119,9 @@ pub fn space_start(app: AppHandle) -> bool {
             match last.as_ref() {
                 Some(prev) if crate::space::keep_previous(&report, Some(prev)) => prev.clone(),
                 _ => {
+                    if report.finished {
+                        compare_with_base(&app, last.as_ref(), &mut report);
+                    }
                     *last = Some(report.clone());
                     save_space(&app, &report);
                     report
@@ -1114,6 +1132,25 @@ pub fn space_start(app: AppHandle) -> bool {
         let _ = app.emit("space:done", &report);
     });
     true
+}
+
+/// 和至少一天前的那次统计比，填上涨得最多的几处。上一次统计已经过了一天，就拿它当新的比较基准。
+fn compare_with_base(app: &AppHandle, prev: Option<&crate::space::SpaceReport>, report: &mut crate::space::SpaceReport) {
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let mut base = db::load_space_base(&dir);
+    // 还没打开过空间去向页时内存里没有上一次的，去磁盘上读
+    let saved = if prev.is_none() { db::load_space(&dir) } else { None };
+    if let Some(prev) = prev.or(saved.as_ref()).filter(|p| p.finished && report.scanned_at_ms >= p.scanned_at_ms + 86_400_000) {
+        let mut prev = prev.clone();
+        // 基准只用来比大小，不用带着上一轮的比较结果
+        prev.growth.clear();
+        let _ = db::save_space_base(&dir, &prev);
+        base = Some(prev);
+    }
+    if let Some(base) = base {
+        report.growth = crate::space::growth(&base.root, &report.root);
+        report.growth_since_ms = base.scanned_at_ms;
+    }
 }
 
 /// 停止正在进行的统计。已有一份数完的结果时，`space:done` 发回的还是它（不拿没数完的覆盖）；
@@ -1271,6 +1308,20 @@ pub fn week_report(app: AppHandle) -> Option<db::WeekReport> {
     let dir = app.path().app_data_dir().ok()?;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
     Some(db::WeekReport { journal: db::journal_summary_since(&dir, now.saturating_sub(db::WEEK_DAYS * 86_400_000)), disk_delta_bytes: db::week_delta(&db::load_usage(&dir)) })
+}
+
+/// 每月体检：电池、硬盘、用量趋势、这个月的清理记录、最近涨得多的文件夹，交给 AI 写一份小结。
+#[tauri::command(async)]
+pub fn ai_checkup(app: AppHandle, on_delta: Channel<String>, fresh: Option<bool>) -> Result<Answer, AiError> {
+    let dir = data_dir(&app)?;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
+    let care = crate::care::report();
+    let month = db::journal_summary_since(&dir, now.saturating_sub(30 * 86_400_000));
+    let trend = db::usage_trend(&db::load_usage(&dir));
+    let space = app.state::<LastSpace>().0.lock().unwrap().clone().or_else(|| db::load_space(&dir));
+    let growth = space.map(|s| s.growth).unwrap_or_default();
+    let data = ai::CheckupData { care: &care, month: &month, trend: trend.as_ref(), growth: &growth };
+    ask(&app, Kind::Checkup, ai::input_for_checkup(&data, &home()), Some(&on_delta), fresh)
 }
 
 /// 让 AI 解释用量趋势：只发每天是几天前和当天的已用量。

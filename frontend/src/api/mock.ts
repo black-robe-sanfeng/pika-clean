@@ -53,6 +53,11 @@ const spaceSample: SpaceReport = {
   finished: true,
   files: 1_840_000,
   scanned_at_ms: 0,
+  growth: [
+    { path: '/Users/demo/Library/Containers/com.docker.docker', size_bytes: 64_000 * MB, delta_bytes: 6_400 * MB },
+    { path: '/Users/demo/Downloads', size_bytes: 40_000 * MB, delta_bytes: 1_200 * MB },
+  ],
+  growth_since_ms: Date.now() - 6 * 86_400_000,
 };
 let spaceDone: SpaceReport | null = null;
 const GB = 1024 ** 3;
@@ -229,7 +234,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'update_check':
       return null;
     case 'settings_get':
-      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, clean_reminder: true, hotkey: false, trash_watch: true, menubar: { cpu: true, mem: false, disk: false, net: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
+      return { autostart: false, ai_consent: consented, dock, ai_backends: apiCfg ? ['claude_cli', 'api_key'] : ['claude_cli'], ai_backend: backend, claude, api: apiCfg, api_key_set: !!apiCfg, onboarded: true, low_disk_alert: true, clean_reminder: true, hotkey: false, trash_watch: true, runaway_alert: true, menubar: { cpu: true, mem: false, disk: false, net: false }, full_disk_access: false, version: '0.1.0', language: mockLanguage(), lang: mockLanguage() ?? 'zh-Hans' };
     case 'autostart_set':
       return args!.on;
     case 'ai_claude_set':
@@ -301,6 +306,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'clean_reminder_set':
     case 'hotkey_set':
     case 'trash_watch_set':
+    case 'runaway_alert_set':
     case 'menubar_set':
     case 'plugin_trash':
     case 'plugin_show':
@@ -330,6 +336,7 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'keyboard_clean_stop':
     case 'open_accessibility_settings':
     case 'open_sponsor_page':
+    case 'open_feedback_page':
       return undefined;
     case 'awake_set':
       return args!.on;
@@ -391,6 +398,8 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
       return undefined;
     case 'usage_trend':
       return { points: [{ day: 20000, used_bytes: 380 * GB, total_bytes: 500 * GB }, { day: 20027, used_bytes: 401 * GB, total_bytes: 500 * GB }], bytes_per_day: 0.78 * GB, days_to_full: 128 };
+    case 'ai_checkup':
+      return fakeAi('（预览用的示例回答）整体状况不错：电池和硬盘都健康，这个月清掉了 3.2 GB。最值得做的两件事：1. Docker 的数据目录一周涨了 6.4 GB，在 Docker 里清理不用的镜像和构建缓存；2. 启动盘每天多用约 0.8 GB，照这个速度 4 个月后写满，可以每月用智能扫描清一次。');
     case 'ai_explain_trend':
       return fakeAi('（预览用的示例回答）近 4 周用量稳步上涨，每天约多用 0.8 GB，常见原因是照片同步、下载文件和开发工具缓存。可以先看看「空间去向」里增长最快的文件夹。');
     case 'ai_explain_space':

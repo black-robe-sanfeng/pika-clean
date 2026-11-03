@@ -56,6 +56,8 @@ pub struct Settings {
     pub hotkey: bool,
     /// 关掉「应用拖进废纸篓时提示清理残留」。默认提示
     pub mute_trash_watch: bool,
+    /// 关掉「进程连续几分钟占满 CPU 时提醒」。默认提醒
+    pub mute_runaway: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq)]
@@ -88,6 +90,18 @@ pub fn save_settings(dir: &Path, settings: &Settings) -> std::io::Result<()> {
     let _guard = SETTINGS_WRITE.lock().unwrap_or_else(|e| e.into_inner());
     std::fs::write(&tmp, serde_json::to_string_pretty(settings)?)?;
     std::fs::rename(tmp, dir.join(SETTINGS))
+}
+
+/// 拿来比「涨了多少」的那次空间统计：至少比最新的一次早一天。
+pub const SPACE_BASE: &str = "space-base.json";
+
+pub fn load_space_base(dir: &Path) -> Option<crate::space::SpaceReport> {
+    serde_json::from_str(&std::fs::read_to_string(dir.join(SPACE_BASE)).ok()?).ok()
+}
+
+pub fn save_space_base(dir: &Path, report: &crate::space::SpaceReport) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    std::fs::write(dir.join(SPACE_BASE), serde_json::to_string(report)?)
 }
 
 /// 最近一次空间统计。重启后打开「空间去向」直接显示它，不用重新数。文件不存在或读不懂时为空。

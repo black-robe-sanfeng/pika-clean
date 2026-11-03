@@ -129,11 +129,15 @@ pub struct Stop<'a> {
 }
 
 impl Stop<'_> {
+    #[cfg(test)]
+    pub(crate) fn for_test(cancel: &AtomicBool) -> Stop<'_> {
+        Stop { deadline: Instant::now() + Duration::from_secs(600), cancel }
+    }
     /// 时限取「从现在起 `budget`」和总时限里早的那个
-    fn within(&self, budget: Duration) -> Stop<'_> {
+    pub(crate) fn within(&self, budget: Duration) -> Stop<'_> {
         Stop { deadline: self.deadline.min(Instant::now() + budget), cancel: self.cancel }
     }
-    fn hit(&self) -> bool {
+    pub(crate) fn hit(&self) -> bool {
         self.cancel.load(Ordering::Relaxed) || Instant::now() >= self.deadline
     }
 }
@@ -219,7 +223,7 @@ const PACKAGE_EXTS: [&str; 16] = ["app", "photoslibrary", "photolibrary", "music
 const SF_DATALESS: u32 = 0x4000_0000;
 
 /// 读目录、读文件都会把它的「上次访问时间」改成现在，而旧下载、旧文件靠这个时间判断多久没用，所以读完改回原来的。
-fn keep_atime(file: &fs::File, meta: &fs::Metadata) {
+pub(crate) fn keep_atime(file: &fs::File, meta: &fs::Metadata) {
     if let Ok(at) = meta.accessed() {
         let _ = file.set_times(fs::FileTimes::new().set_accessed(at));
     }
@@ -227,7 +231,7 @@ fn keep_atime(file: &fs::File, meta: &fs::Metadata) {
 
 /// 在主目录下 `dirs` 这几个位置里逐个看普通文件，交给 `f`。不跟随符号链接，不跨磁盘，
 /// 跳过隐藏的、依赖目录、「包」，以及还在 iCloud 上没下载到本机的文件。返回 false 表示时限内没看完。
-fn walk_personal(home: &Path, dirs: &[&str], stop: &Stop, f: &mut dyn FnMut(PathBuf, &fs::Metadata)) -> bool {
+pub(crate) fn walk_personal(home: &Path, dirs: &[&str], stop: &Stop, f: &mut dyn FnMut(PathBuf, &fs::Metadata)) -> bool {
     let Ok(dev) = home.symlink_metadata().map(|m| m.dev()) else { return true };
     let mut stack: Vec<PathBuf> = dirs.iter().map(|d| home.join(d)).collect();
     while let Some(dir) = stack.pop() {
@@ -261,7 +265,7 @@ fn walk_personal(home: &Path, dirs: &[&str], stop: &Stop, f: &mut dyn FnMut(Path
     true
 }
 
-fn last_used(meta: &fs::Metadata) -> Option<SystemTime> {
+pub(crate) fn last_used(meta: &fs::Metadata) -> Option<SystemTime> {
     [meta.modified(), meta.accessed()].into_iter().flatten().max()
 }
 
@@ -348,6 +352,82 @@ fn find_duplicates(home: &Path, stop: &Stop) -> (Vec<(PathBuf, u64, Option<Syste
         }
     }
     (found, done)
+}
+
+/// 安装包的扩展名。
+const INSTALLER_EXTS: [&str; 3] = ["dmg", "pkg", "zip"];
+
+/// 只留字母和数字、转小写，用来比较安装包和应用的名字（`Google Chrome` 和 `googlechrome.dmg`）。
+fn name_key(s: &str) -> String {
+    s.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect()
+}
+
+/// 装好的应用：（名字比较键，装进来的时间）。只看「应用程序」第一层，系统自带的在 /System 下，不看。
+/// 装进来的时间取状态改变时间：拷贝应用时访达保留原来的修改时间，但新文件的状态改变时间是拷进来那一刻。
+pub(crate) fn installed_apps(home: &Path) -> Vec<(String, SystemTime)> {
+    [PathBuf::from("/Applications"), home.join("Applications")]
+        .iter()
+        .flat_map(|d| fs::read_dir(d).into_iter().flatten().flatten())
+        .filter_map(|e| {
+            let p = e.path();
+            (p.extension()? == "app").then_some(())?;
+            let m = p.symlink_metadata().ok()?;
+            Some((name_key(&p.file_stem()?.to_string_lossy()), UNIX_EPOCH + Duration::from_secs(m.ctime().max(0) as u64)))
+        })
+        .collect()
+}
+
+/// 安装包对应的应用已经装好：安装包名以应用名开头（应用名至少 5 个字母，免得 `Bear` 认走 `bear-notes.zip`），
+/// 而且应用是在下载安装包之后才装（或更新）的。还没装的新版本安装包不算。
+pub(crate) fn installer_done(stem: &str, downloaded: SystemTime, apps: &[(String, SystemTime)]) -> bool {
+    let key = name_key(stem);
+    apps.iter().any(|(app, installed)| app.chars().count() >= 5 && key.starts_with(app.as_str()) && downloaded <= *installed)
+}
+
+/// 「下载」里对应应用已经装好的安装包。
+fn find_installers(home: &Path, apps: &[(String, SystemTime)], stop: &Stop) -> (Vec<(PathBuf, u64, Option<SystemTime>)>, bool) {
+    let mut found = Vec::new();
+    let done = walk_personal(home, &["Downloads"], stop, &mut |path, meta| {
+        let ext = path.extension().map(|x| x.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+        let (Some(stem), Ok(downloaded)) = (path.file_stem(), meta.modified()) else { return };
+        if INSTALLER_EXTS.contains(&ext.as_str()) && installer_done(&stem.to_string_lossy(), downloaded, apps) {
+            found.push((path.clone(), meta.blocks() * 512, last_used(meta)));
+        }
+    });
+    (found, done)
+}
+
+/// 系统截图和录屏的文件名开头，各语言都有。
+const SCREENSHOT_PREFIXES: [&str; 14] = [
+    "Screenshot", "Screen Shot", "Screen Recording", "截屏", "屏幕快照", "录屏", "屏幕录制", "螢幕截圖", "螢幕快照", "螢幕錄影", "スクリーンショット", "画面収録", "스크린샷", "화면 기록",
+];
+/// 一个月内的截图可能还要用，不列。
+const SCREENSHOT_DAYS: u64 = 30;
+
+/// 截图保存的位置：桌面，加上用户在截屏工具里改过的位置（只认个人文件夹里面的）。
+fn screenshot_dirs(home: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![home.join("Desktop")];
+    let out = crate::devenv::run(Path::new("/usr/bin/defaults"), &["read", "com.apple.screencapture", "location"], Duration::from_secs(3)).unwrap_or_default();
+    let custom = out.trim();
+    let custom = custom.strip_prefix("~/").map_or_else(|| PathBuf::from(custom), |r| home.join(r));
+    if custom.starts_with(home) && custom != home && !dirs.contains(&custom) {
+        dirs.push(custom);
+    }
+    dirs
+}
+
+/// 这几个文件夹第一层里一个月前的系统截图和录屏。
+pub(crate) fn find_screenshots(dirs: &[PathBuf], now: SystemTime) -> (Vec<(PathBuf, u64, Option<SystemTime>)>, bool) {
+    let mut found = Vec::new();
+    for e in dirs.iter().flat_map(|d| fs::read_dir(d).into_iter().flatten().flatten()) {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let Ok(meta) = e.path().symlink_metadata() else { continue };
+        let old = meta.modified().ok().and_then(|t| now.duration_since(t).ok()).is_some_and(|d| d >= Duration::from_secs(SCREENSHOT_DAYS * 86400));
+        if meta.is_file() && old && SCREENSHOT_PREFIXES.iter().any(|p| name.starts_with(p)) {
+            found.push((e.path(), meta.blocks() * 512, last_used(&meta)));
+        }
+    }
+    (found, true)
 }
 
 /// 项目里可以重新生成的依赖和构建目录：目录名 → 证明它确实是这类产物的标志文件（相对项目目录，有一个就算）。
@@ -469,6 +549,9 @@ impl CategoryId {
             Self::Duplicates => "duplicates",
             Self::LargeFiles => "large_files",
             Self::BrowserPrivacy => "browser_privacy",
+            Self::Installers => "installers",
+            Self::Screenshots => "screenshots",
+            Self::SimilarPhotos => "similar_photos",
         }
     }
 }
@@ -492,6 +575,8 @@ pub fn default_rules(home: &Path) -> Vec<Rule> {
         // 清理它要输管理员密码，所以默认不勾选，免得每次清理都弹密码框
         Rule { needs_admin: true, default_selected: false, ..rule(CategoryId::SystemCache, PathBuf::from("/Library/Caches")) },
         Rule { needs_full_disk_access: true, ..rule(CategoryId::Trash, home.join(".Trash")) },
+        // 个人文件：默认不勾选，只进废纸篓。排在「旧下载文件」前面，同一个安装包算在这一类
+        Rule { default_selected: false, ..rule(CategoryId::Installers, home.to_path_buf()) },
         Rule { default_selected: false, older_than_days: Some(OLD_DOWNLOAD_DAYS), ..rule(CategoryId::OldDownloads, home.join("Downloads")) },
         rule(CategoryId::Logs, home.join("Library/Logs")),
         // 删了以后下次构建要重新下载依赖，比较费时间，所以默认不勾选
@@ -517,7 +602,9 @@ pub fn default_rules(home: &Path) -> Vec<Rule> {
         // 删了会退出各网站的登录：默认不勾选，只进废纸篓。Safari 的记录要完全磁盘访问才读得到，读不到的文件不列
         Rule { default_selected: false, needs_full_disk_access: true, only: &BROWSER_PRIVACY_FILES, ..rule(CategoryId::BrowserPrivacy, home.to_path_buf()) },
         // 下面两类是个人文件：默认不勾选，只移到废纸篓。放在最后，前面各类已经列过的文件不再重复列
+        Rule { default_selected: false, ..rule(CategoryId::Screenshots, home.to_path_buf()) },
         Rule { default_selected: false, ..rule(CategoryId::Duplicates, home.to_path_buf()) },
+        Rule { default_selected: false, ..rule(CategoryId::SimilarPhotos, home.to_path_buf()) },
         Rule { default_selected: false, ..rule(CategoryId::LargeFiles, home.to_path_buf()) },
     ]
 }
@@ -596,10 +683,16 @@ fn scan_category(rule: &Rule, now: SystemTime, recent: &dyn Fn(&Path, u64) -> Ha
         partial: false,
         only: rule.only.iter().map(|s| (*s).to_owned()).collect(),
     };
-    if matches!(rule.id, CategoryId::Duplicates | CategoryId::LargeFiles) {
+    if matches!(rule.id, CategoryId::Duplicates | CategoryId::LargeFiles | CategoryId::Installers | CategoryId::Screenshots | CategoryId::SimilarPhotos) {
         // 个人文件夹里找出来的单个文件，大小直接取文件本身的占用；找到的路径记进 only，删除前的守卫只认这几个
         let personal = stop.within(PERSONAL_BUDGET);
-        let (found, done) = if rule.id == CategoryId::Duplicates { find_duplicates(&rule.root, &personal) } else { find_large_files(&rule.root, now, &personal) };
+        let (found, done) = match rule.id {
+            CategoryId::Duplicates => find_duplicates(&rule.root, &personal),
+            CategoryId::Installers => find_installers(&rule.root, &installed_apps(&rule.root), &personal),
+            CategoryId::Screenshots => find_screenshots(&screenshot_dirs(&rule.root), now),
+            CategoryId::SimilarPhotos => crate::similar::find(&rule.root, &personal),
+            _ => find_large_files(&rule.root, now, &personal),
+        };
         cat.partial = !done;
         for (path, size_bytes, last) in found {
             let Ok(rel) = path.strip_prefix(&rule.root) else { continue };
@@ -907,7 +1000,7 @@ mod tests {
         let report = scan(&default_rules(&home), SystemTime::now(), &spotlight_recent, &|_| {}, &AtomicBool::new(false));
         for c in &report.categories {
             println!("{:<15} {:>5} 项 {:>9.1} MB{}{}", c.id.as_str(), c.items.len(), c.total_bytes as f64 / 1_048_576.0, if c.partial { "（至少）" } else { "" }, if c.unreadable { "（读不到）" } else { "" });
-            if c.id == CategoryId::StaleProjects {
+            if matches!(c.id, CategoryId::StaleProjects | CategoryId::Installers | CategoryId::Screenshots | CategoryId::SimilarPhotos) {
                 for i in &c.items {
                     println!("  {:>9.1} MB  {}", i.size_bytes as f64 / 1_048_576.0, i.path.strip_prefix(&home).unwrap_or(&i.path).display());
                 }
@@ -1120,6 +1213,47 @@ mod tests {
         assert!(!c.partial && c.removal == crate::remove::Mode::Trash && c.only == ["Downloads/a copy.mov"]);
         let at = keep.symlink_metadata().unwrap().accessed().unwrap();
         assert!(at <= long_ago + Duration::from_secs(1), "读过内容后把访问时间改回去了");
+    }
+
+    #[test]
+    fn 已经装好的安装包() {
+        let t0 = SystemTime::now();
+        let apps = vec![("googlechrome".to_string(), t0), ("slack".to_string(), t0 - Duration::from_secs(86400)), ("mail".to_string(), t0)];
+        assert!(installer_done("googlechrome", t0 - Duration::from_secs(60), &apps), "下载后才装的");
+        assert!(installer_done("Google Chrome (1)", t0, &apps));
+        assert!(!installer_done("Slack-4.4", t0, &apps), "装的是旧版，新版安装包还没用过");
+        assert!(!installer_done("mail-backup", t0 - Duration::from_secs(60), &apps), "应用名太短不认");
+        assert!(!installer_done("notes", t0, &apps));
+
+        let t = TempTree::new();
+        let dmg = t.file("Downloads/GoogleChrome.dmg", 10);
+        t.file("Downloads/GoogleChrome.txt", 10);
+        t.file("Downloads/Other.dmg", 10);
+        let later = SystemTime::now() + Duration::from_secs(60);
+        let (found, done) = find_installers(&t.0, &[("googlechrome".into(), later)], &Stop { deadline: Instant::now() + Duration::from_secs(5), cancel: &AtomicBool::new(false) });
+        assert!(done);
+        assert_eq!(found.into_iter().map(|f| f.0).collect::<Vec<_>>(), [dmg]);
+    }
+
+    #[test]
+    fn 一个月前的截图和录屏() {
+        let t = TempTree::new();
+        let long_ago = SystemTime::now() - Duration::from_secs(40 * 86400);
+        let mut want = Vec::new();
+        for name in ["截屏2024-01-01 10.00.00.png", "Screen Recording 2024-01-01.mov", "스크린샷 2024.png", "photo.png", "Screenshot new.png"] {
+            let p = t.file(&format!("Desktop/{name}"), 10);
+            if name != "Screenshot new.png" {
+                fs::File::options().write(true).open(&p).unwrap().set_times(fs::FileTimes::new().set_modified(long_ago)).unwrap();
+                if name != "photo.png" {
+                    want.push(p);
+                }
+            }
+        }
+        t.file("Desktop/sub/Screenshot old.png", 10);
+        let mut got: Vec<_> = find_screenshots(&[t.0.join("Desktop")], SystemTime::now()).0.into_iter().map(|f| f.0).collect();
+        got.sort();
+        want.sort();
+        assert_eq!(got, want);
     }
 
     #[test]

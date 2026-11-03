@@ -218,19 +218,19 @@ export function OptimizePage({ active }: { active: boolean }) {
   return (
     <>
       <div className="scroll">
-        <h1>{t('优化速度')}</h1>
-        <p>{t('释放内存、管理开机启动项、结束占用资源的进程')}</p>
-        {ai && (
-          <div style={{ marginBottom: 14, display: 'grid', gap: 10, justifyItems: 'start' }}>
+        <h1 className="title-row">
+          {t('优化速度')}
+          {ai && (
             <button className="pill" onClick={() => setDiagnose((n) => n + 1)}>
               <Icon name="scan" />
               {diagnose ? t('重新诊断') : t('为什么我的 Mac 变慢了？')}
             </button>
-            {diagnose > 0 && (
-              <div style={{ justifySelf: 'stretch' }}>
-                <AiAnswer key={diagnose} ask={api.aiDiagnose} caution={t('动手前请自行确认')} />
-              </div>
-            )}
+          )}
+        </h1>
+        <p>{t('释放内存、管理开机启动项、结束占用资源的进程')}</p>
+        {ai && diagnose > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <AiAnswer key={diagnose} ask={api.aiDiagnose} caution={t('动手前请自行确认')} />
           </div>
         )}
         <div className="cols optimize-grid">

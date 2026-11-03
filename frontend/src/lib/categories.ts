@@ -21,6 +21,9 @@ export const CATEGORY: Record<CategoryId, { name: string; desc: string; icon: Ic
   homebrew_old: { name: t('Homebrew 旧版本'), desc: t('升级后留下的旧版本，只列出 brew cleanup 认为可以删的'), icon: 'cube', color: 'c-orange' },
   duplicates: { name: t('重复文件'), desc: t('下载、桌面、文稿里内容完全相同的文件，每组留一份，其余列在这里'), icon: 'doc', color: 'c-orange' },
   browser_privacy: { name: t('浏览器记录和 Cookie'), desc: t('Safari、Chrome、Edge、Brave 的浏览记录和 Cookie，删了会退出各网站的登录；书签和密码不动'), icon: 'chat', color: 'c-indigo' },
+  installers: { name: t('已装过的安装包'), desc: t('下载里的 .dmg、.pkg、.zip 安装包，对应的应用已经装好了'), icon: 'down', color: 'c-teal' },
+  screenshots: { name: t('旧截图和录屏'), desc: t('桌面上一个月前的截图和屏幕录制'), icon: 'cam', color: 'c-indigo' },
+  similar_photos: { name: t('相似照片'), desc: t('连拍或导出了好几份的照片，每组留最大的一张，其余列在这里；「照片」图库里的不算'), icon: 'cam', color: 'c-purple' },
   large_files: { name: t('大文件和旧文件'), desc: t('个人文件夹里超过 50 MB，或一年没打开且超过 10 MB 的文件'), icon: 'doc', color: 'c-red' },
 };
 

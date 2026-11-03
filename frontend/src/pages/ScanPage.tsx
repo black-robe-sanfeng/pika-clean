@@ -8,24 +8,28 @@ import { bytes } from '../lib/fmt';
 import { t } from '../lib/i18n.ts';
 
 /**
- * 结果列表顶上的 AI 洞察：这次扫描的总结（`summary` 为真时才给）。
+ * 结果页的 AI 总结：按钮放在标题行右边（`SummaryButton`），回答在标题下面（`Insights`）。
  * AI 只在用户点击后才调用，不在后台自动调用；每来一份新报告，总结就收起。
  */
-export function Insights({ scan, summary }: { scan: ScanState; summary: boolean }) {
+export function useSummary(scan: ScanState) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [scan]);
+  return { open, show: () => setOpen(true) };
+}
+
+export function SummaryButton({ summary, show }: { summary: { open: boolean }; show: () => void }) {
   const ai = useAiAvailable();
-  const [summarize, setSummarize] = useState(false);
-  useEffect(() => setSummarize(false), [scan]);
+  if (!ai || summary.open) return null;
   return (
-    <div className="insights">
-      {ai && summary && !summarize && (
-        <button className="pill" onClick={() => setSummarize(true)}>
-          <Icon name="scan" />
-          {t('生成 AI 总结')}
-        </button>
-      )}
-      {summarize && <AiAnswer ask={api.aiSummarizeScan} />}
-    </div>
+    <button className="pill" onClick={show}>
+      <Icon name="scan" />
+      {t('生成 AI 总结')}
+    </button>
   );
+}
+
+export function Insights({ open }: { open: boolean }) {
+  return <div className="insights">{open && <AiAnswer ask={api.aiSummarizeScan} />}</div>;
 }
 
 /**

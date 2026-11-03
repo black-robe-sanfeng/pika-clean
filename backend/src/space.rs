@@ -59,6 +59,55 @@ pub struct SpaceReport {
     /// 统计完成的时间（毫秒时间戳）
     #[serde(default)]
     pub scanned_at_ms: u64,
+    /// 和至少一天前的那次统计比，涨得最多的几处（由调用方填）
+    #[serde(default)]
+    pub growth: Vec<Growth>,
+    /// 拿来比的那次统计的时间；没有可比的为 0
+    #[serde(default)]
+    pub growth_since_ms: u64,
+}
+
+/// 一处变大了的文件夹或文件。
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Growth {
+    /// 显示用路径
+    pub path: String,
+    pub size_bytes: u64,
+    pub delta_bytes: u64,
+}
+
+/// 涨了不到这么多的不列。
+pub const GROWTH_MIN_BYTES: u64 = 500_000_000;
+/// 最多列这么多处。
+const GROWTH_TOP: usize = 5;
+
+/// 两次统计之间涨得最多的几处，互不包含：涨了 `GROWTH_MIN_BYTES` 以上、子项里又没有够格的那一层。
+/// 上次没单独列出的位置（当时太小、或者是新建的）按 0 算。
+pub fn growth(old: &Node, new: &Node) -> Vec<Growth> {
+    fn sizes(n: &Node, out: &mut HashMap<String, u64>) {
+        out.insert(n.path.clone(), n.size_bytes);
+        n.children.iter().for_each(|c| sizes(c, out));
+    }
+    fn grown(n: &Node, old: &HashMap<String, u64>, out: &mut Vec<Growth>) {
+        let delta = n.size_bytes.saturating_sub(old.get(&n.path).copied().unwrap_or(0));
+        if delta < GROWTH_MIN_BYTES {
+            return;
+        }
+        let start = out.len();
+        n.children.iter().for_each(|c| grown(c, old, out));
+        // 列出的各处互不包含：子项里有够格的就列子项，说得更具体
+        if out.len() == start {
+            out.push(Growth { path: n.path.clone(), size_bytes: n.size_bytes, delta_bytes: delta });
+        }
+    }
+    let mut before = HashMap::new();
+    sizes(old, &mut before);
+    let mut out = Vec::new();
+    // 根节点（整个启动盘）本身不列
+    new.children.iter().for_each(|c| grown(c, &before, &mut out));
+    out.sort_by_key(|g| std::cmp::Reverse(g.delta_bytes));
+    out.truncate(GROWTH_TOP);
+    out
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -129,6 +178,8 @@ pub fn scan(root: &Path, home: &Path, cleanable: &[PathBuf], limits: Limits, can
         finished: !cancel.load(Ordering::Relaxed),
         files,
         scanned_at_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64),
+        growth: Vec::new(),
+        growth_since_ms: 0,
     }
 }
 
@@ -466,6 +517,31 @@ mod tests {
     }
     fn sum(n: &Node) -> u64 {
         n.children.iter().map(|c| c.size_bytes).sum::<u64>() + n.other_bytes
+    }
+
+    #[test]
+    fn 涨得最多的几处() {
+        const G: u64 = 1_000_000_000;
+        let n = |path: &str, size: u64, children: Vec<Node>| Node { name: path.rsplit('/').next().unwrap().into(), path: path.into(), size_bytes: size, is_dir: true, cleanable: false, trashable: false, children, other_bytes: 0 };
+        let old = n("/", 100 * G, vec![n("/Users/me", 50 * G, vec![n("/Users/me/Library", 20 * G, vec![n("/Users/me/Library/WeChat", 5 * G, vec![])]), n("/Users/me/Movies", 10 * G, vec![])])]);
+        let new = n(
+            "/",
+            120 * G,
+            vec![n(
+                "/Users/me",
+                70 * G,
+                vec![
+                    // 资源库涨的 8 GB 里微信占 6 GB：列微信，不再列资源库
+                    n("/Users/me/Library", 28 * G, vec![n("/Users/me/Library/WeChat", 11 * G, vec![])]),
+                    // 影片涨了 10 GB，但单独列出的子项都是新出现的小于门槛的：列影片
+                    n("/Users/me/Movies", 20 * G, vec![n("/Users/me/Movies/a", G / 4, vec![])]),
+                    // 新出现的
+                    n("/Users/me/Downloads", 2 * G, vec![]),
+                ],
+            )],
+        );
+        let got: Vec<(String, u64)> = growth(&old, &new).into_iter().map(|g| (g.path, g.delta_bytes / G)).collect();
+        assert_eq!(got, [("/Users/me/Movies".to_string(), 10), ("/Users/me/Library/WeChat".to_string(), 6), ("/Users/me/Downloads".to_string(), 2)]);
     }
 
     #[test]

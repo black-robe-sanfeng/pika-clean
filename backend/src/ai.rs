@@ -112,6 +112,8 @@ pub enum Kind {
     ExplainSpace,
     ExplainTrend,
     ExplainLoginItem,
+    /// 每月体检。加在最后：缓存键里用的是序号，插在中间会让已有缓存全部失效
+    Checkup,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -343,6 +345,36 @@ pub fn input_for_trend(points: &[crate::db::UsagePoint]) -> Value {
     json!({ "days": points.iter().map(|p| json!({ "days_ago": last - p.day, "used": human(p.used_bytes) })).collect::<Vec<_>>() })
 }
 
+/// 每月体检要用的数据，都是本机已经算好的数字和名字。
+pub struct CheckupData<'a> {
+    pub care: &'a crate::model::CareReport,
+    /// 最近 30 天的清理记录
+    pub month: &'a crate::model::JournalSummary,
+    pub trend: Option<&'a crate::db::UsageTrend>,
+    pub growth: &'a [crate::space::Growth],
+}
+
+/// 每月体检：只发数字、应用名和涨得多的文件夹路径（不变量 4），不发文件内容。
+pub fn input_for_checkup(d: &CheckupData, home: &Path) -> Value {
+    let disk = &d.care.disk;
+    let names = |hogs: &[crate::model::Hog]| hogs.iter().take(3).map(|h| h.name.clone()).collect::<Vec<_>>();
+    json!({
+        "disk": {
+            "used": human(disk.used_bytes),
+            "total": human(disk.total_bytes),
+            "ssd_health_pct": disk.smart.as_ref().map(|s| s.health_pct),
+            "ssd_spare_pct": disk.smart.as_ref().map(|s| s.spare_pct),
+            "daily_change": d.trend.map(|t| format!("{}{}", if t.bytes_per_day < 0 { "-" } else { "+" }, human(t.bytes_per_day.unsigned_abs()))),
+            "days_to_full": d.trend.and_then(|t| t.days_to_full),
+        },
+        "battery": d.care.battery.as_ref().map(|b| json!({ "health_pct": b.health_pct.map(|h| h.round()), "cycles": b.cycles, "design_cycles": b.design_cycles })),
+        "this_month": { "cleaned": human(d.month.cleaned_bytes), "apps_uninstalled": d.month.uninstalled },
+        "grown_folders": d.growth.iter().map(|g| json!({ "path": tilde(Path::new(&g.path), home), "grew": human(g.delta_bytes) })).collect::<Vec<_>>(),
+        "top_energy_apps": names(&d.care.energy),
+        "top_disk_write_apps": names(&d.care.writes),
+    })
+}
+
 /// 「整理下载」：只发文件名、大小和多久没用。
 pub fn input_for_downloads(cat: &Category, now_ms: u64) -> Value {
     let files: Vec<Value> = cat
@@ -439,6 +471,9 @@ fn prompt(kind: Kind, input: &Value) -> String {
         Kind::ExplainTrend => format!(
             "下面是一台 Mac 启动盘最近几周每天的已用空间（days_ago 是几天前）：\n{data}\n\n请在 120 字以内说明：用量在涨还是在降、大约每天变化多少，常见的可能原因（比如照片、下载、开发工具缓存、系统更新），以及一两条具体建议。大小已经换算好，引用时照抄。"
         ),
+        Kind::Checkup => format!(
+            "下面是一台 Mac 这个月的体检数据（disk 是启动盘，daily_change 是最近几周平均每天多用的空间，days_to_full 是照这个速度几天后写满；grown_folders 是最近涨得最多的文件夹；this_month 是这个月用清理工具腾出的空间；为空的项是读不到）：\n{data}\n\n请写一份 200 字以内的体检小结：先用一句话说整体状况，再按轻重列两三条最值得做的事，每条说清楚为什么、怎么做。电池或硬盘健康没问题就一笔带过。大小已经换算好，引用时照抄。"
+        ),
         Kind::SummarizeScan => format!(
             "下面是一次磁盘清理扫描的结果（largest 是每类里最大的几项；selected_by_default 为 true 的类别会被默认勾选）：\n{data}\n\n请在 120 字以内总结：空间主要被什么占用、默认勾选的类别清理后能腾出多少、是否会影响个人文件。大小已经换算好，引用时照抄，不要自己重新换算或相加。"
         ),
@@ -455,7 +490,7 @@ fn cache_key(kind: Kind, input: &Value, variant: &str) -> String {
         Kind::ExplainLoginItem => input.clone(),
         Kind::UninstallRisk => json!([input["bundle_id"]]),
         Kind::Diagnose | Kind::Plan | Kind::OrganizeDownloads => input.clone(),
-        Kind::SummarizeScan | Kind::ExplainTrend => input.clone(),
+        Kind::SummarizeScan | Kind::ExplainTrend | Kind::Checkup => input.clone(),
     };
     // ponytail: 标准库的哈希不保证跨 Rust 版本稳定，升级编译器后最坏情况是缓存全部失效一次，可以接受
     use std::hash::{Hash, Hasher};
@@ -1090,6 +1125,25 @@ mod tests {
         assert_eq!(a["kind"], "folder");
         assert_eq!(cache_key(Kind::ExplainSpace, &a, ""), cache_key(Kind::ExplainSpace, &input_for_space(&node(9_000_000_000), home), ""), "大小变了还是同一个问题");
         assert!(prompt(Kind::ExplainSpace, &a).contains("150 字"));
+    }
+
+    #[test]
+    fn 体检只发数字和名字() {
+        let care = crate::model::CareReport {
+            battery: None,
+            disk: crate::model::DiskCare { used_bytes: 400_000_000_000, total_bytes: 500_000_000_000, smart: None },
+            energy: vec![crate::model::Hog { name: "Chrome".into(), pid: 1, value: 9, app: true }],
+            writes: vec![],
+        };
+        let month = crate::model::JournalSummary { cleaned_bytes: 3_000_000_000, uninstalled: 2, optimized: 0 };
+        let growth = [crate::space::Growth { path: "/Users/me/Library/WeChat".into(), size_bytes: 9, delta_bytes: 6_000_000_000 }];
+        let trend = crate::db::UsageTrend { points: vec![], bytes_per_day: -1_000_000_000, days_to_full: None };
+        let input = input_for_checkup(&CheckupData { care: &care, month: &month, trend: Some(&trend), growth: &growth }, Path::new("/Users/me"));
+        assert_eq!(input["grown_folders"][0]["path"], "~/Library/WeChat");
+        assert_eq!(input["disk"]["daily_change"], format!("-{}", human(1_000_000_000)));
+        assert_eq!(input["top_energy_apps"], json!(["Chrome"]));
+        assert!(input["battery"].is_null());
+        assert!(prompt(Kind::Checkup, &input).contains("200 字"));
     }
 
     #[test]

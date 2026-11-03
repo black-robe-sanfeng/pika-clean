@@ -8,13 +8,13 @@ An open-source Mac cleaner that tells you what a file is, and whether it's safe 
 
 ## Features
 
-- **Smart scan & clean**: caches, logs, Trash, old downloads, crash dumps, and browser history and cookies in one pass. Optional weekly reminder when there's a lot to clean.
+- **Smart scan & clean**: caches, logs, Trash, old downloads, used installers, old screenshots, similar photos, crash dumps, and browser history and cookies in one pass. Optional weekly reminder when there's a lot to clean.
 - **AI explanations**: click anything you're unsure about and AI tells you what it is and what happens if you delete it. Or just say "free up space, but don't touch my downloads".
 - **Uninstaller**: removes apps along with their preferences, caches, and support files. Drag an app to the Trash and it offers to clean up what was left behind. Also checks for app updates (including Homebrew) and lists browser extensions and plug-ins.
-- **Speed up**: free memory, manage login items, quit resource-hungry processes.
+- **Speed up**: free memory, manage login items, quit resource-hungry processes; get a notification when an app keeps the CPU maxed out.
 - **Menu bar monitor**: CPU, GPU, memory, disk, network, battery, temperature, and fans. You can also show usage and network speed right in the menu bar, open the app from anywhere with ⌃⌥P, or clean caches, logs and the Trash in two clicks.
 - **Developer cleanup**: Xcode, simulators, Docker, package managers, and caches from AI tools such as Claude and Cursor.
-- **Space map**: see where your startup disk's space actually goes.
+- **Space map**: see where your startup disk's space actually goes, and which folders grew the most lately.
 
 Available in English, 简体中文, 繁體中文, 日本語, and 한국어.
 
