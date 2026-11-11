@@ -28,6 +28,8 @@ export interface Proc {
   pid: number;
   mem_bytes: number;
   cpu_pct: number;
+  /** 所属 .app 的位置，用来取图标；不属于应用时为空 */
+  app_path?: string | null;
 }
 
 /** 保养页的体检结果，对应 model.rs 的 CareReport */
@@ -60,6 +62,7 @@ export interface Hog {
   value: number;
   /** 是 .app 应用才能退出 */
   app: boolean;
+  app_path?: string | null;
 }
 
 export interface DeviceInfo {

@@ -574,7 +574,8 @@ pub fn default_rules(home: &Path) -> Vec<Rule> {
         Rule { skip_prefixes: &["com.apple.", "com.pikaclean.", "claude-cli-nodejs"], ..rule(CategoryId::AppCache, home.join("Library/Caches")) },
         // 清理它要输管理员密码，所以默认不勾选，免得每次清理都弹密码框
         Rule { needs_admin: true, default_selected: false, ..rule(CategoryId::SystemCache, PathBuf::from("/Library/Caches")) },
-        Rule { needs_full_disk_access: true, ..rule(CategoryId::Trash, home.join(".Trash")) },
+        // 清空废纸篓不可恢复，而卸载、空间去向都对用户说过「清空前都能找回」，所以默认不勾选；快速清理和每周提醒也因此不碰它
+        Rule { needs_full_disk_access: true, default_selected: false, ..rule(CategoryId::Trash, home.join(".Trash")) },
         // 个人文件：默认不勾选，只进废纸篓。排在「旧下载文件」前面，同一个安装包算在这一类
         Rule { default_selected: false, ..rule(CategoryId::Installers, home.to_path_buf()) },
         Rule { default_selected: false, older_than_days: Some(OLD_DOWNLOAD_DAYS), ..rule(CategoryId::OldDownloads, home.join("Downloads")) },
@@ -886,6 +887,13 @@ pub(crate) mod testutil {
 mod tests {
     use super::testutil::TempTree;
     use super::*;
+
+    /// 清空废纸篓不可恢复：默认不勾，快速清理和每周提醒（只看默认勾选的类别）也就不会碰它
+    #[test]
+    fn trash_is_opt_in() {
+        let rules = default_rules(Path::new("/nonexistent-home"));
+        assert!(!rules.iter().find(|r| r.id == CategoryId::Trash).unwrap().default_selected);
+    }
 
     fn rule(id: CategoryId, root: PathBuf) -> Rule {
         Rule { id, root, default_selected: true, needs_admin: false, needs_full_disk_access: false, older_than_days: None, skip_prefixes: &[], only: &[] }

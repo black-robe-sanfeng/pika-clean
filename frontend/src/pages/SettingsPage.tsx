@@ -193,9 +193,13 @@ export function SettingsPage({ active }: { active: boolean }) {
     api.adminPasswordless().then(setFree);
     return api.settingsGet().then(setS);
   };
-  // 每次进入都重新读：完全磁盘访问是在系统设置里改的，回来时状态可能变了
+  // 每次进入、以及从系统设置切回窗口时都重新读：完全磁盘访问是在系统设置里改的，回来时状态可能变了
   useEffect(() => {
-    if (active) reload();
+    if (!active) return;
+    reload();
+    const onFocus = () => reload();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [active]);
   const [editApi, setEditApi] = useState(false);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
@@ -214,34 +218,6 @@ export function SettingsPage({ active }: { active: boolean }) {
       <div className="group plain">
         <div className="row">
           <span className="grow">
-            <span>{t('当前版本')}</span>
-            <small>{t('启动时和之后每 6 小时自动检查新版本')}</small>
-          </span>
-          <span>{s?.version}</span>
-          <button className="btn gray sm" disabled={!s} onClick={checkUpdate}>
-            {t('检查更新')}
-          </button>
-        </div>
-        <div className="row">
-          <span className="grow">
-            <span>{t('支持作者')}</span>
-            <small>{t('全部功能免费。觉得好用可以在爱发电赞助，赞助不解锁任何功能')}</small>
-          </span>
-          <button className="btn gray sm" onClick={() => api.openSponsorPage().catch((e) => toast(String(e)))}>
-            {t('去赞助')}
-          </button>
-        </div>
-        <div className="row">
-          <span className="grow">
-            <span>{t('意见反馈')}</span>
-            <small>{t('遇到问题或有想法，到 GitHub 提一个 issue')}</small>
-          </span>
-          <button className="btn gray sm" onClick={() => api.openFeedbackPage().catch((e) => toast(String(e)))}>
-            {t('去反馈')}
-          </button>
-        </div>
-        <div className="row">
-          <span className="grow">
             <span>{t('菜单栏显示')}</span>
             <small>{t('在菜单栏图标旁边用文字显示用量')}</small>
           </span>
@@ -257,34 +233,6 @@ export function SettingsPage({ active }: { active: boolean }) {
             </label>
           ))}
         </div>
-        <label className="row">
-          <span className="grow">
-            <span>{t('磁盘快满时提醒')}</span>
-            <small>{t('可用空间不足一成时发一条系统通知，每天最多一次')}</small>
-          </span>
-          <input className="sw" type="checkbox" checked={s?.low_disk_alert ?? true} disabled={!s} onChange={(e) => api.lowDiskAlertSet(e.target.checked).then(reload)} />
-        </label>
-        <label className="row">
-          <span className="grow">
-            <span>{t('每周提醒清理')}</span>
-            <small>{t('缓存、日志和废纸篓超过 2 GB 时发一条系统通知，只提醒不删除')}</small>
-          </span>
-          <input className="sw" type="checkbox" checked={s?.clean_reminder ?? true} disabled={!s} onChange={(e) => api.cleanReminderSet(e.target.checked).then(reload)} />
-        </label>
-        <label className="row">
-          <span className="grow">
-            <span>{t('卸载时提示清理残留')}</span>
-            <small>{t('把应用拖进废纸篓后，问你要不要把它留下的偏好设置和缓存一起清掉。需要完全磁盘访问权限')}</small>
-          </span>
-          <input className="sw" type="checkbox" checked={s?.trash_watch ?? true} disabled={!s} onChange={(e) => api.trashWatchSet(e.target.checked).then(reload)} />
-        </label>
-        <label className="row">
-          <span className="grow">
-            <span>{t('进程占满 CPU 时提醒')}</span>
-            <small>{t('某个应用连续 5 分钟以上把 CPU 占满（卡住的网页、跑飞的脚本）时发一条系统通知')}</small>
-          </span>
-          <input className="sw" type="checkbox" checked={s?.runaway_alert ?? true} disabled={!s} onChange={(e) => api.runawayAlertSet(e.target.checked).then(reload)} />
-        </label>
         <label className="row">
           <span className="grow">
             <span>{t('快捷键打开主窗口')}</span>
@@ -347,6 +295,38 @@ export function SettingsPage({ active }: { active: boolean }) {
         </div>
       </div>
 
+      <div className="gh">{t('通知')}</div>
+      <div className="group plain">
+        <label className="row">
+          <span className="grow">
+            <span>{t('磁盘快满时提醒')}</span>
+            <small>{t('可用空间不足一成时发一条系统通知，每天最多一次')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.low_disk_alert ?? true} disabled={!s} onChange={(e) => api.lowDiskAlertSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
+            <span>{t('每周提醒清理')}</span>
+            <small>{t('缓存和日志超过 2 GB 时发一条系统通知，只提醒不删除')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.clean_reminder ?? true} disabled={!s} onChange={(e) => api.cleanReminderSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
+            <span>{t('卸载时提示清理残留')}</span>
+            <small>{t('把应用拖进废纸篓后，问你要不要把它留下的偏好设置和缓存一起清掉。需要完全磁盘访问权限')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.trash_watch ?? true} disabled={!s} onChange={(e) => api.trashWatchSet(e.target.checked).then(reload)} />
+        </label>
+        <label className="row">
+          <span className="grow">
+            <span>{t('进程占满 CPU 时提醒')}</span>
+            <small>{t('某个应用连续 5 分钟以上把 CPU 占满（卡住的网页、跑飞的脚本）时发一条系统通知')}</small>
+          </span>
+          <input className="sw" type="checkbox" checked={s?.runaway_alert ?? true} disabled={!s} onChange={(e) => api.runawayAlertSet(e.target.checked).then(reload)} />
+        </label>
+      </div>
+
       <div className="gh">{t('主题')}</div>
       <div className="group theme-picker">
         <p>{t('选择主题，统一改变背景、色调和装饰。原皮肤随时可以切回。')}</p>
@@ -380,7 +360,7 @@ export function SettingsPage({ active }: { active: boolean }) {
         <div className="row">
           <span className="grow">
             <span>{t('完全磁盘访问')}</span>
-            <small>{s?.full_disk_access ? t('已授权') : t('未授权。没有它就读不了废纸篓，其余功能不受影响')}</small>
+            <small>{s?.full_disk_access ? t('已授权') : t('未授权。没有它读不了废纸篓、iOS 备份、邮件附件、Safari 记录，也不能在应用被拖进废纸篓时清残留。授权后重新扫描一次')}</small>
           </span>
           {s && !s.full_disk_access && (
             <button className="btn gray sm" onClick={() => api.openFullDiskAccessSettings().catch((e) => toast(String(e)))}>
@@ -453,6 +433,38 @@ export function SettingsPage({ active }: { active: boolean }) {
         </div>
       </div>
       <Ignored active={active} />
+
+      <div className="gh">{t('关于')}</div>
+      <div className="group plain">
+        <div className="row">
+          <span className="grow">
+            <span>{t('当前版本')}</span>
+            <small>{t('启动时和之后每 6 小时自动检查新版本')}</small>
+          </span>
+          <span>{s?.version}</span>
+          <button className="btn gray sm" disabled={!s} onClick={checkUpdate}>
+            {t('检查更新')}
+          </button>
+        </div>
+        <div className="row">
+          <span className="grow">
+            <span>{t('支持作者')}</span>
+            <small>{t('全部功能免费。觉得好用可以在爱发电赞助，赞助不解锁任何功能')}</small>
+          </span>
+          <button className="btn gray sm" onClick={() => api.openSponsorPage().catch((e) => toast(String(e)))}>
+            {t('去赞助')}
+          </button>
+        </div>
+        <div className="row">
+          <span className="grow">
+            <span>{t('意见反馈')}</span>
+            <small>{t('遇到问题或有想法，到 GitHub 提一个 issue')}</small>
+          </span>
+          <button className="btn gray sm" onClick={() => api.openFeedbackPage().catch((e) => toast(String(e)))}>
+            {t('去反馈')}
+          </button>
+        </div>
+      </div>
       {s && editApi && (
         <ApiDialog
           s={s}

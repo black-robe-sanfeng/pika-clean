@@ -520,9 +520,7 @@ pub fn request_quit(pid: u32) -> bool {
 pub fn quit_and_wait(app: &Path, timeout: Duration) -> bool {
     let ask = |pids: &[u32]| {
         for &pid in pids {
-            if !request_quit(pid) {
-                let _ = crate::system::quit(pid);
-            }
+            let _ = crate::system::quit(pid);
         }
     };
     let pids = |main: bool| processes_in(app).into_iter().filter(|p| p.1 == main).map(|p| p.0).collect::<Vec<_>>();

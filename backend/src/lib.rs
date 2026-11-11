@@ -9,6 +9,7 @@ mod keychain;
 pub mod db;
 pub mod devenv;
 pub mod i18n;
+pub mod icon;
 pub mod mascot;
 pub mod metrics;
 mod migrate;
@@ -72,7 +73,7 @@ fn daily_housekeeping(app: &AppHandle, snap: &model::Snapshot, last_alert_day: &
     }
 }
 
-/// 每周看一次缓存、日志、废纸篓攒了多少，超过 2 GB 发一条通知。只提醒，不删东西。
+/// 每周看一次缓存、日志攒了多少，超过 2 GB 发一条通知。只提醒，不删东西。
 /// 扫描放到单独的线程里，不耽误采样。
 fn clean_reminder(app: &AppHandle, dir: &std::path::Path, now_ms: u64) {
     let mut settings = db::load_settings(dir);
@@ -95,7 +96,7 @@ fn clean_reminder(app: &AppHandle, dir: &std::path::Path, now_ms: u64) {
         let bytes: u64 = report.categories.iter().map(|c| c.total_bytes).sum();
         if bytes >= db::CLEAN_REMINDER_BYTES {
             let gb = format!("{:.1}", bytes as f64 / 1_073_741_824.0);
-            let _ = app.notification().builder().title(i18n::t("可以清理一下了")).body(i18n::t("缓存、日志和废纸篓攒了 {0} GB。打开 Pika Clean 一键清理？").replace("{0}", &gb)).show();
+            let _ = app.notification().builder().title(i18n::t("可以清理一下了")).body(i18n::t("缓存和日志攒了 {0} GB。打开 Pika Clean 一键清理？").replace("{0}", &gb)).show();
         }
     });
 }
@@ -256,6 +257,7 @@ pub fn run() {
             commands::open_full_disk_access_settings,
             commands::open_sponsor_page,
             commands::open_feedback_page,
+            commands::app_icon,
             commands::admin_run,
             commands::admin_passwordless,
             commands::admin_passwordless_set,

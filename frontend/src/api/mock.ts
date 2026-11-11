@@ -338,6 +338,9 @@ export function call(cmd: string, args?: Record<string, unknown>): unknown {
     case 'open_sponsor_page':
     case 'open_feedback_page':
       return undefined;
+    // 浏览器预览拿不到真实图标，显示首字母
+    case 'app_icon':
+      return new ArrayBuffer(0);
     case 'awake_set':
       return args!.on;
     case 'volumes_list':

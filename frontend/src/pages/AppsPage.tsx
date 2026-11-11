@@ -5,7 +5,7 @@ import { Dialog } from '../components/Dialog';
 import { Icon } from '../components/Icon';
 import { toast } from '../components/Toast';
 import { ago, bytes } from '../lib/fmt';
-import { tint } from '../lib/tint';
+import { AppIcon } from '../components/AppIcon';
 import { useArmed } from '../lib/useArmed';
 import { t } from '../lib/i18n.ts';
 
@@ -49,6 +49,8 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
   const [orphanPicked, setOrphanPicked] = useState<Set<string>>(new Set());
   const [orphanConfirming, setOrphanConfirming] = useState(false);
   const ai = useAiAvailable();
+  // 顶部分段：应用列表很长，更新、残留、插件放在它下面基本没人会滚到
+  const [tab, setTab] = useState<'apps' | 'updates' | 'orphans' | 'plugins'>('apps');
   // 有新版本的应用：null 表示还没查过
   const [updates, setUpdates] = useState<AppUpdate[] | null>(null);
   const [checking, setChecking] = useState(false);
@@ -119,6 +121,7 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
     focused.current = focus;
     setQuery(apps.find((a) => a.path === focus.path)?.name ?? baseName(focus.path).replace(/\.app$/, ''));
     setFilter('all');
+    setTab('apps');
   }, [focus, apps]);
 
   function toggle(app: AppInfo) {
@@ -142,7 +145,9 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
     } finally {
       setBusy(false);
       setStep(null);
-      load();
+      // 静默重读，不清空列表、不丢滚动位置。等这一轮渲染完 busy 变回 false 再读
+      setPicked(new Set());
+      setTimeout(() => refreshRef.current());
     }
   }
 
@@ -186,9 +191,18 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
 
   return (
     <>
-      <div className="scroll hasbar">
+      <div className={`scroll${tab === 'apps' ? ' hasbar' : ''}`}>
         <h1>{t('卸载软件')}</h1>
         <p>{t('连同缓存、偏好设置等残留文件一起移到废纸篓')}</p>
+        <div className="seg tabs">
+          {(['apps', 'updates', 'orphans', 'plugins'] as const).map((k) => (
+            <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+              {{ apps: t('应用'), updates: t('软件更新'), orphans: t('已删除应用的残留'), plugins: t('扩展和插件') }[k]}
+            </button>
+          ))}
+        </div>
+        {tab === 'apps' && (
+          <>
         <div className="tools">
           <input className="search" type="search" placeholder={t('搜索应用')} aria-label={t('搜索应用')} value={query} onChange={(e) => setQuery(e.target.value)} />
           <div className="seg">
@@ -212,9 +226,7 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
                   revealMenu(() => api.appReveal(a.id).catch((err) => toast(String(err))));
                 }}
               >
-                <span className={`ic lg ${tint(a.name)}`} aria-hidden="true">
-                  {a.name.charAt(0).toUpperCase()}
-                </span>
+                <AppIcon name={a.name} path={a.path} size="lg" />
                 <span className="grow">
                   <span>
                     {a.name}
@@ -242,8 +254,10 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
             </Fragment>
           ))}
         </div>
+          </>
+        )}
 
-        <div className="gh">{t('软件更新')}</div>
+        {tab === 'updates' && (
         <div className="group plain">
           {updates == null || checking ? (
             <button className="row" onClick={checkUpdates} disabled={checking || apps == null}>
@@ -278,8 +292,9 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
             ))
           )}
         </div>
+        )}
 
-        <div className="gh">{t('已删除应用的残留')}</div>
+        {tab === 'orphans' && (
         <div className="group plain">
           {orphans == null ? (
             <button className="row" onClick={findOrphans} disabled={finding}>
@@ -317,17 +332,18 @@ export function AppsPage({ active, focus }: { active: boolean; focus?: { path: s
             </>
           )}
         </div>
+        )}
 
-        <Plugins />
+        {tab === 'plugins' && <Plugins />}
       </div>
 
-      <div className="bar">
+      {tab === 'apps' && <div className="bar">
         <span>{t('已选 {0} 个应用', chosen.length)}</span>
         <span className="num">{bytes(chosenBytes)}</span>
         <button className="btn red" disabled={chosen.length === 0 || busy} onClick={() => setConfirming(true)}>
           {busy ? (step?.waiting ? t('正在等「{0}」退出…', step.name) : step ? t('正在卸载 {0}/{1}', step.done + 1, step.total) : t('正在卸载…')) : t('卸载')}
         </button>
-      </div>
+      </div>}
 
       {confirming && (
         <Dialog
@@ -449,7 +465,6 @@ function Plugins() {
   };
   return (
     <>
-      <div className="gh">{t('扩展和插件')}</div>
       <div className="group plain">
         {list == null ? (
           <button className="row" onClick={load} disabled={loading}>

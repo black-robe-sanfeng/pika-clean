@@ -36,7 +36,7 @@ export function Insights({ open }: { open: boolean }) {
  * 用量趋势：最近几周每天多用多少、照这个速度几天后写满（数字在本机算，规格切片 14）。
  * 「AI 解释」点了才问（不变量 5）。
  */
-function Trend() {
+export function Trend() {
   const ai = useAiAvailable();
   const [trend, setTrend] = useState<UsageTrend | null | undefined>(undefined);
   const [explain, setExplain] = useState(false);
@@ -45,11 +45,7 @@ function Trend() {
   }, []);
   if (trend === undefined) return null;
   if (trend === null)
-    return (
-      <div className="trend">
-        <p>{t('用量趋势：再积累一两天的记录后显示')}</p>
-      </div>
-    );
+    return <p>{t('用量趋势：再积累一两天的记录后显示')}</p>;
   const days = trend.points[trend.points.length - 1].day - trend.points[0].day;
   const left = trend.days_to_full;
   const text =
@@ -59,7 +55,7 @@ function Trend() {
         ? t('近 {0} 天每天多用约 {1}，按这个速度一年内写不满', days, bytes(trend.bytes_per_day))
         : t('近 {0} 天每天多用约 {1}，按这个速度约 {2} 天后写满', days, bytes(trend.bytes_per_day), left);
   return (
-    <div className="trend">
+    <>
       <p>
         {text}
         {ai && !explain && (
@@ -69,12 +65,12 @@ function Trend() {
         )}
       </p>
       {explain && <AiAnswer ask={api.aiExplainTrend} />}
-    </div>
+    </>
   );
 }
 
 /** 近 7 天做了什么、磁盘多用了多少。数字全在本机算，不调用 AI；什么都没有时不显示 */
-function Week() {
+export function Week() {
   const [week, setWeek] = useState<WeekReport | null>(null);
   useEffect(() => {
     api.weekReport().then(setWeek, () => setWeek(null));
@@ -87,11 +83,7 @@ function Week() {
     d != null && (d >= 0 ? t('磁盘多用了 {0}', bytes(d)) : t('磁盘少用了 {0}', bytes(-d))),
   ].filter(Boolean);
   if (!parts.length) return null;
-  return (
-    <div className="trend">
-      <p>{t('近 7 天：{0}', parts.join(' · '))}</p>
-    </div>
-  );
+  return <p>{t('近 7 天：{0}', parts.join(' · '))}</p>;
 }
 
 /** 还没有扫描结果时的样子：一个大按钮，第一次扫描时显示进度。有了结果之后这一页换成 CleanPage 的结果列表。 */
@@ -105,8 +97,10 @@ export function ScanPage({ scan, onScan, onCancel }: { scan: ScanState; onScan: 
           {t('扫描')}
         </button>
         <p>{t('检查缓存、日志、废纸篓和旧下载，找出可以腾出的空间')}</p>
-        <Trend />
-        <Week />
+        <div className="trend">
+          <Trend />
+          <Week />
+        </div>
       </div>
 
       <div className="s-run">

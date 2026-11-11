@@ -95,6 +95,8 @@ pub struct Proc {
     pub mem_bytes: u64,
     /// 按单核 100% 计，与「活动监视器」一致，可以超过 100
     pub cpu_pct: f32,
+    /// 所属最外层 `.app` 的位置，界面用它取图标；不属于任何应用时为空
+    pub app_path: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -164,6 +166,8 @@ pub struct Hog {
     pub value: u64,
     /// 是不是 `.app` 应用；只有应用才给「退出」按钮，系统服务退了也会被拉起来
     pub app: bool,
+    /// 同 `Proc::app_path`
+    pub app_path: Option<String>,
 }
 
 // ---- 扫描与删除 ----

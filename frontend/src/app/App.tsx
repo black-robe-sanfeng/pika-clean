@@ -27,8 +27,8 @@ export function App() {
   const report = useRef<ScanReport | null>(null);
   if (scan.state.phase === 'done') report.current = scan.state.report;
   const scanned = report.current != null;
-  // 重新扫描：丢掉旧结果，回到首页的大按钮，由用户再点开始
-  const rescan = () => {
+  // 返回首页：丢掉页面上的结果，回到大按钮，由用户再点开始
+  const back = () => {
     report.current = null;
     scan.reset();
   };
@@ -105,7 +105,7 @@ export function App() {
         <main className="main">
           <ToastHost />
           <section className="view" hidden={view !== 'scan'}>
-            {scanned ? <CleanPage scan={scan.state} onRescan={rescan} focus={jump?.view === 'scan' ? jump : null} /> : <ScanPage scan={scan.state} onScan={scan.start} onCancel={scan.cancel} />}
+            {scanned ? <CleanPage scan={scan.state} onRescan={scan.start} onCancel={scan.cancel} onBack={back} focus={jump?.view === 'scan' ? jump : null} /> : <ScanPage scan={scan.state} onScan={scan.start} onCancel={scan.cancel} />}
           </section>
           <section className="view" hidden={view !== 'space'}>
             <SpacePage
@@ -113,6 +113,8 @@ export function App() {
               onGo={(v, path) => {
                 setJump({ view: v, path });
                 setView(v);
+                // 还没扫描过时清理页只有一个大按钮，跳过去会扑空：直接开始扫描，扫完再打开那个类别
+                if (v === 'scan' && !scanned && scan.state.phase === 'idle') scan.start();
               }}
             />
           </section>
@@ -185,8 +187,8 @@ export function App() {
             </div>
             <div className="row">
               <span className="grow">
-                <span>{t('读废纸篓需要额外授权')}</span>
-                <small style={{ whiteSpace: 'normal' }}>{t('不授权也能用其余功能。需要时在「设置」里点「去授权」。')}</small>
+                <span>{t('部分功能需要额外授权')}</span>
+                <small style={{ whiteSpace: 'normal' }}>{t('读废纸篓、iOS 备份、邮件附件和 Safari 记录需要「完全磁盘访问」。不授权也能用其余功能。')}</small>
               </span>
               <button className="btn gray sm" onClick={() => api.openFullDiskAccessSettings().catch((e) => toast(String(e)))}>
                 {t('去授权')}

@@ -133,9 +133,8 @@ fn rescan(app: &AppHandle, ids: &'static [CategoryId]) {
     std::thread::spawn(move || {
         let guard = ScanGuard(app.clone());
         let rules: Vec<scan::Rule> = scan::default_rules(&home()).into_iter().filter(|r| ids.contains(&r.id)).collect();
-        let fresh = scan::scan(&rules, SystemTime::now(), &scan::spotlight_recent, &|p| {
-            let _ = app.emit("scan:progress", &p);
-        }, &AtomicBool::new(false)); // 清理后的小范围重扫不响应「取消」
+        // 不发进度：界面收到进度会切成「正在扫描…」，清理后的小范围重扫只在完成时发 scan:update。也不响应「取消」
+        let fresh = scan::scan(&rules, SystemTime::now(), &scan::spotlight_recent, &|_| {}, &AtomicBool::new(false));
         let last = app.state::<LastScan>();
         last.1.lock().unwrap().extend(remove::stamps(&fresh.categories));
         let merged = {
@@ -265,7 +264,8 @@ pub fn quick_clean(app: AppHandle, dry_run: bool) -> Result<RemoveResult, String
 /// 最近一次清理移到废纸篓的条目（原位置和在废纸篓里的位置）。
 #[tauri::command]
 pub fn trash_last(app: AppHandle) -> Vec<Trashed> {
-    app.path().app_data_dir().map(|d| db::load_trashed(&d)).unwrap_or_default()
+    // 废纸篓被清空后记录还在，只列还在废纸篓里的，免得「放回原处」点了报错
+    app.path().app_data_dir().map(|d| db::load_trashed(&d)).unwrap_or_default().into_iter().filter(|r| r.to.exists()).collect()
 }
 
 /// 只认最近一次清理记下的、在废纸篓里的这个位置
@@ -518,6 +518,9 @@ pub async fn volume_eject(name: String) -> Result<(), String> {
 /// 请一个进程退出。`name` 必须在最近一次的进程列表里；进程号由后端查，前端不传。
 #[tauri::command]
 pub fn process_quit(app: AppHandle, latest: State<Latest>, name: String) -> Result<(), String> {
+    if system::KEEP.contains(&name.as_str()) {
+        return Err(t("不能退出这个进程").into());
+    }
     let pid = latest.0.lock().unwrap().as_ref().and_then(|s| s.top.iter().find(|p| p.name == name).map(|p| p.pid)).ok_or(t("进程已不在列表里"))?;
     system::quit(pid)?;
     if let Ok(dir) = app.path().app_data_dir() {
@@ -552,7 +555,7 @@ pub async fn apps_quit(app: AppHandle, names: Vec<String>) -> Result<Vec<String>
             if pid <= 1 || pid == std::process::id() {
                 continue;
             }
-            if apps::request_quit(pid) || system::quit(pid).is_ok() {
+            if system::quit(pid).is_ok() {
                 asked.push((name.clone(), pid));
             }
         }
@@ -598,6 +601,16 @@ pub async fn open_full_disk_access_settings() -> Result<(), String> {
 #[tauri::command]
 pub async fn open_sponsor_page() -> Result<(), String> {
     blocking(|| open(&["https://afdian.com/a/black-robe-sanfeng".as_ref()])).await
+}
+
+/// 应用图标，PNG 原始字节。路径必须是存在的 `.app`，见 `icon::check`；取不到时返回空。
+#[tauri::command]
+pub async fn app_icon(path: String) -> Result<tauri::ipc::Response, String> {
+    blocking(move || {
+        let app = crate::icon::check(&path).ok_or(t("不是应用"))?;
+        Ok(tauri::ipc::Response::new(crate::icon::png(&app).unwrap_or_default()))
+    })
+    .await
 }
 
 /// 用默认浏览器打开 GitHub 上新建 issue 的页面。地址同样写死在这里。

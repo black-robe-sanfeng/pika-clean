@@ -48,6 +48,10 @@ small{color:var(--sub);font-size:12px}
 .ic.sm{width:22px;height:22px;border-radius:6px;font:600 11px var(--round)}
 .ic.brand-icon{background:none}
 .ic.brand-icon img{display:block;width:124%;height:124%;max-width:none}
+/* 系统图标四周自带约一成留白，放大一点和字母方块一样大 */
+/* 用绝对定位：放在 grid 里时百分比高度算不准，图会被拉高 */
+.ic.app-icon{background:none;position:relative}
+.ic.app-icon img{position:absolute;left:-9%;top:-9%;width:118%;height:118%;max-width:none}
 .c-green{--c:var(--green)}.c-orange{--c:var(--orange)}.c-red{--c:var(--red)}.c-purple{--c:var(--purple)}.c-teal{--c:var(--teal)}.c-indigo{--c:var(--indigo)}.c-gray{--c:var(--gray)}
 .gh{margin:14px 14px 7px;color:var(--sub);font-size:12px}
 .group{background:var(--card);border-radius:12px;overflow:hidden}
@@ -103,6 +107,8 @@ button.row{width:100%;text-align:left}
 .scan .trend p{font-size:13px}
 .scan .trend .link{margin-left:8px;font-size:13px}
 .scan .trend>:not(p){width:460px;max-width:calc(100vw - 280px);text-align:left}
+.scroll>.trend{display:grid;gap:4px;margin:0 14px 16px}.scroll>.trend:empty{display:none}
+.scroll>.trend p{margin:0;font-size:12px;color:var(--sub)}.scroll>.trend .link{margin-left:8px;font-size:12px}
 .orb{position:relative;width:190px;height:190px;border-radius:50%;color:#fff;font-size:30px;font-weight:700;letter-spacing:.1em;text-indent:.1em;background:radial-gradient(circle at 30% 25%,#7CC4FF,#007AFF 55%,#5856D6);box-shadow:0 22px 50px rgba(0,122,255,.45),inset 0 2px 0 rgba(255,255,255,.35);transition:.2s}
 .orb:hover{scale:1.04}
 .orb::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:2px solid var(--blue);opacity:0;animation:pulse 2.4s infinite}
@@ -215,7 +221,7 @@ button.row{width:100%;text-align:left}
 .pill svg{width:15px;height:15px}
 h1.title-row .pill{margin-left:auto;height:28px;padding:0 13px;border-radius:14px;font-size:13px}
 h1.title-row .pill svg{width:13px;height:13px}
-h1.title-row .pill+.btn{margin-left:0}
+h1.title-row .pill+.btn,h1.title-row .pill+.pill{margin-left:0}
 .aicard{display:flex;gap:10px;max-width:598px;padding:12px 14px;border-radius:14px;text-align:left;font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--purple) 10%,var(--card))}
 .aicard svg{flex:none;width:18px;height:18px;margin-top:2px;color:var(--purple)}
 /* 空间统计中边数边显示的位置列表 */
@@ -438,3 +444,7 @@ color-scheme:light;--win:var(--theme-paper);--label:var(--theme-ink);--sub:var(-
 
 /* 开发环境里可以点开的那几行 */
 .group button.row{width:100%;text-align:left}
+@media(max-width:1050px){.cols{grid-template-columns:minmax(0,1fr)}}
+:root[data-theme]:not([data-theme=original]) .window .bar .btn:disabled{background:var(--fill);color:var(--sub)}
+.seg.tabs{width:fit-content;margin:2px 0 14px}
+h1.title-row .btn+.btn{margin-left:0}

@@ -13,14 +13,11 @@ const PRESETS = [t('只清不影响使用的'), t('尽量多腾空间，个人�
  */
 export function AskClean({
   categories,
-  onPlan,
   onApply,
   disabled,
 }: {
   /** 最近一次扫描的类别，用来算方案能腾出多少 */
   categories: Category[];
-  /** 方案一出来就通知（清理页用它直接改勾选） */
-  onPlan?: (ids: CategoryId[]) => void;
   /** 用户点了「按这个勾选并查看确认单」 */
   onApply: (ids: CategoryId[]) => void;
   /** 正在清理或正在扫描：报告马上要变，不让按旧方案打开确认单 */
@@ -68,10 +65,7 @@ export function AskClean({
         <AiAnswer
           key={asked.n}
           ask={(_, fresh) => api.aiPlan(asked.text, fresh).then((p) => ({ ...p, text: p.reason || (p.categories.length ? t('已按你的要求挑好了类别。') : t('没有找到符合要求的类别。')) }))}
-          onAnswer={(p) => {
-            setPlan(p);
-            onPlan?.(p.categories);
-          }}
+          onAnswer={(p) => setPlan(p)}
           caution={t('清理前还要你在确认单里确认')}
         />
       )}

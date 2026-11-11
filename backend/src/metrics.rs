@@ -39,10 +39,25 @@ pub struct RawProc {
     pub cpu_pct: f32,
 }
 
-/// 路径里最外层的 `.app` 包名，如 `/Applications/Google Chrome.app/...Helper.app/...` → `Google Chrome`。
+/// 路径里最外层的 `.app` 包，如 `/Applications/Google Chrome.app/...Helper.app/...` → `/Applications/Google Chrome.app`。
+fn app_dir(exe: &Path) -> Option<PathBuf> {
+    let mut dir = PathBuf::new();
+    for c in exe.components() {
+        dir.push(c);
+        if c.as_os_str().to_str().is_some_and(|s| s.ends_with(".app")) {
+            return Some(dir);
+        }
+    }
+    None
+}
+
+/// 最外层 `.app` 的包名，如 `Google Chrome`。
+fn app_name(dir: &Path) -> String {
+    dir.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
 fn app_of(exe: &Path) -> Option<String> {
-    exe.components()
-        .find_map(|c| c.as_os_str().to_str()?.strip_suffix(".app").map(str::to_owned))
+    app_dir(exe).map(|d| app_name(&d))
 }
 
 /// 合并规则：沿父进程一路往上，归到最顶层的那个 `.app`。所以应用启动的另一个应用也算在它头上
@@ -53,18 +68,18 @@ fn app_of(exe: &Path) -> Option<String> {
 pub fn group_processes(raw: &[RawProc]) -> Vec<Proc> {
     let by_pid: HashMap<u32, &RawProc> = raw.iter().map(|p| (p.pid, p)).collect();
     // 从某个进程起沿父进程一路往上，取最顶层的那个 `.app`
-    let app_up = |start: Option<&RawProc>| -> Option<String> {
+    let app_up = |start: Option<&RawProc>| -> Option<PathBuf> {
         let (mut cur, mut top) = (start, None);
         // 上限防止父子关系成环
         for _ in 0..64 {
             let Some(c) = cur else { break };
-            top = c.exe.as_deref().and_then(app_of).or(top);
+            top = c.exe.as_deref().and_then(app_dir).or(top);
             cur = c.parent.and_then(|pp| by_pid.get(&pp).copied());
         }
         top
     };
-    let owner = |p: &RawProc| -> Option<String> {
-        if p.exe.as_deref().and_then(app_of).is_some() {
+    let owner = |p: &RawProc| -> Option<PathBuf> {
+        if p.exe.as_deref().and_then(app_dir).is_some() {
             return app_up(Some(p));
         }
         let responsible = p.responsible.filter(|r| *r != p.pid).and_then(|r| by_pid.get(&r).copied());
@@ -74,11 +89,11 @@ pub fn group_processes(raw: &[RawProc]) -> Vec<Proc> {
     let mut groups: HashMap<String, Proc> = HashMap::new();
     for p in raw {
         // 不属于任何应用的进程用「名称#进程号」做键，保证互不合并
-        let (key, name) = match owner(p) {
-            Some(app) => (app.clone(), app),
-            None => (format!("{}#{}", p.name, p.pid), p.name.clone()),
+        let (key, name, app_path) = match owner(p) {
+            Some(dir) => (app_name(&dir), app_name(&dir), Some(dir.to_string_lossy().into_owned())),
+            None => (format!("{}#{}", p.name, p.pid), p.name.clone(), None),
         };
-        let g = groups.entry(key).or_insert(Proc { name, pid: p.pid, mem_bytes: 0, cpu_pct: 0.0 });
+        let g = groups.entry(key).or_insert(Proc { name, pid: p.pid, mem_bytes: 0, cpu_pct: 0.0, app_path });
         g.mem_bytes += p.mem_bytes;
         g.cpu_pct += p.cpu_pct;
         // 进程号最小的通常是应用的主进程，用它代表整组
@@ -131,7 +146,7 @@ pub fn hogs(n: usize) -> (Vec<Hog>, Vec<Hog>) {
     // ponytail: 借 group_processes 的「归到应用」和排序，把要合计的数临时放进 mem_bytes
     let top = |pick: fn(&(u64, u64)) -> u64| -> Vec<Hog> {
         let with: Vec<RawProc> = raw.iter().zip(&used).map(|(p, u)| RawProc { mem_bytes: pick(u), ..p.clone() }).collect();
-        group_processes(&with).into_iter().filter(|g| g.mem_bytes > 0).take(n).map(|g| Hog { app: apps.contains(&g.name), name: g.name, pid: g.pid, value: g.mem_bytes }).collect()
+        group_processes(&with).into_iter().filter(|g| g.mem_bytes > 0).take(n).map(|g| Hog { app: apps.contains(&g.name), name: g.name, pid: g.pid, value: g.mem_bytes, app_path: g.app_path }).collect()
     };
     (top(|u| u.0), top(|u| u.1))
 }
@@ -640,7 +655,9 @@ mod tests {
         ];
         let out = group_processes(&procs);
         assert_eq!(out.len(), 2);
-        assert_eq!(out[0], Proc { name: "Google Chrome".into(), pid: 100, mem_bytes: 1000, cpu_pct: 5.0 });
+        // 图标取最外层的应用包，不是辅助进程的
+        assert_eq!(out[0], Proc { name: "Google Chrome".into(), pid: 100, mem_bytes: 1000, cpu_pct: 5.0, app_path: Some("/Applications/Google Chrome.app".into()) });
+        assert_eq!(out[1].app_path, None);
         assert_eq!(out[1].name, "launchd");
     }
 
@@ -675,7 +692,7 @@ mod tests {
             RawProc { responsible: Some(999), ..raw(501, Some(1), "mds", Some("/usr/libexec/mds"), 20, 0.0) },
         ];
         let out = group_processes(&procs);
-        assert_eq!(out[0], Proc { name: "Docker".into(), pid: 400, mem_bytes: 1000, cpu_pct: 31.0 });
+        assert_eq!(out[0], Proc { name: "Docker".into(), pid: 400, mem_bytes: 1000, cpu_pct: 31.0, app_path: Some("/Applications/Docker.app".into()) });
         assert_eq!(out.iter().filter(|p| p.name == "mds").count(), 2);
     }
 
@@ -691,7 +708,7 @@ mod tests {
             RawProc { responsible: Some(601), ..raw(602, Some(601), "node", Some("/usr/local/bin/node"), 100, 3.0) },
         ];
         let out = group_processes(&procs);
-        assert_eq!(out[0], Proc { name: "Claude".into(), pid: 600, mem_bytes: 600, cpu_pct: 6.0 });
+        assert_eq!(out[0], Proc { name: "Claude".into(), pid: 600, mem_bytes: 600, cpu_pct: 6.0, app_path: Some("/Applications/Claude.app".into()) });
         assert_eq!(out.len(), 2);
     }
 

@@ -2,6 +2,7 @@ import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef, useSta
 import { type AdminError, type AdminTask, api, type LoginItem, type LoginItems, type Passwordless, type Proc, useAiAvailable, useSnapshot } from '../api';
 import { Check } from '../components/Check';
 import { AiAnswer } from '../components/AiAnswer';
+import { AppIcon } from '../components/AppIcon';
 import { Dialog } from '../components/Dialog';
 import { Sheet } from '../components/Sheet';
 import { Icon, type IconName, Tile } from '../components/Icon';
@@ -9,6 +10,7 @@ import { toast } from '../components/Toast';
 import { gb, mem, pct } from '../lib/fmt';
 import { tint } from '../lib/tint';
 import { useArmed } from '../lib/useArmed';
+import { KEEP } from '../lib/keep';
 import { t } from '../lib/i18n.ts';
 
 const PRESSURE = { normal: t('正常'), warn: t('偏高'), critical: t('紧张') } as const;
@@ -43,8 +45,6 @@ function MemoryCard({ active, status, running, onPurge }: { active: boolean; sta
   );
 }
 
-/** 退出也腾不出内存、或者退了会出问题的：系统自己的进程和本应用 */
-const KEEP = new Set(['Finder', 'Dock', 'SystemUIServer', 'WindowServer', 'loginwindow', 'ControlCenter', 'Spotlight', 'kernel_task', 'Pika Clean', 'pikaclean']);
 const PURGE_KEY = '__purge__';
 
 /**
@@ -110,22 +110,7 @@ function MemorySheet({ open, noPassword, onClose, onDone }: { open: boolean; noP
       }
     >
       <p>{t('真正能腾出内存的是退出占得多的应用。这里只是请应用自己退出，和按 ⌘Q 一样，有没保存的内容时它会先问你。')}</p>
-      <div className="gh">{t('退出这些应用')}</div>
-      <div className="group" data-empty={apps == null ? t('正在读取…') : t('没有占内存多的应用')}>
-        {(apps ?? []).map((a) => (
-          <label className="row" key={a.name}>
-            <span className={`ic ${tint(a.name)}`} aria-hidden="true">
-              {a.name.charAt(0).toUpperCase()}
-            </span>
-            <span className="grow">
-              <span>{a.name}</span>
-              <small style={{ whiteSpace: 'normal' }}>{/docker/i.test(a.name) ? t('大部分是它的虚拟机；在 Docker 设置的「资源」里调低内存上限，能长期少占') : t('退出可腾出约 {0}', mem(a.mem_bytes))}</small>
-            </span>
-            <span className="num">{mem(a.mem_bytes)}</span>
-            <Check all={picked.has(a.name)} disabled={busy != null} onChange={() => toggle(a.name)} aria-label={a.name} />
-          </label>
-        ))}
-      </div>
+      {/* 系统这一项放在前面：应用列表可能很长，放后面要滚动才看得到 */}
       <div className="gh">{t('系统')}</div>
       <div className="group">
         <label className="row">
@@ -135,6 +120,20 @@ function MemorySheet({ open, noPassword, onClose, onDone }: { open: boolean; noP
           </span>
           <Check all={picked.has(PURGE_KEY)} disabled={busy != null} onChange={() => toggle(PURGE_KEY)} aria-label={t('清理文件缓存')} />
         </label>
+      </div>
+      <div className="gh">{t('退出这些应用')}</div>
+      <div className="group" data-empty={apps == null ? t('正在读取…') : t('没有占内存多的应用')}>
+        {(apps ?? []).map((a) => (
+          <label className="row" key={a.name}>
+            <AppIcon name={a.name} path={a.app_path} />
+            <span className="grow">
+              <span>{a.name}</span>
+              <small style={{ whiteSpace: 'normal' }}>{/docker/i.test(a.name) ? t('大部分是它的虚拟机；在 Docker 设置的「资源」里调低内存上限，能长期少占') : t('退出可腾出约 {0}', mem(a.mem_bytes))}</small>
+            </span>
+            <span className="num">{mem(a.mem_bytes)}</span>
+            <Check all={picked.has(a.name)} disabled={busy != null} onChange={() => toggle(a.name)} aria-label={a.name} />
+          </label>
+        ))}
       </div>
     </Sheet>
   );
@@ -148,15 +147,14 @@ function TopProcesses({ active }: { active: boolean }) {
     <div className="group" data-empty={t('正在读取…')}>
       {(snap?.top ?? []).slice(0, 5).map((p) => (
         <div className="row" key={p.pid}>
-          <span className={`ic ${tint(p.name)}`} aria-hidden="true">
-            {p.name.charAt(0).toUpperCase()}
-          </span>
+          <AppIcon name={p.name} path={p.app_path} />
           <span className="grow">
             <span>{p.name}</span>
             <small>CPU {p.cpu_pct.toFixed(1)}%</small>
           </span>
           <span className="num">{mem(p.mem_bytes)}</span>
           <button
+            style={KEEP.has(p.name) ? { visibility: 'hidden' } : undefined}
             className={`btn sm ${quit.armed === p.name ? 'red' : 'gray'}`}
             onClick={() => quit.press(p.name) && api.processQuit(p.name).then(() => toast(t('已请 {0} 退出', p.name)), (e) => toast(t('{0}：{1}', p.name, e)))}
           >

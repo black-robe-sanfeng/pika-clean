@@ -68,10 +68,17 @@ pub fn eject(volumes_dir: &Path, name: &str) -> Result<(), String> {
     }
 }
 
-/// 请一个进程退出（发终止信号，让它自己收尾）。不强杀。
+/// 退出也腾不出东西、退了会出问题的系统进程和本应用，三处「退出」按钮都不给退。
+pub const KEEP: &[&str] = &["Finder", "Dock", "SystemUIServer", "WindowServer", "loginwindow", "ControlCenter", "Spotlight", "kernel_task", "Pika Clean", "pikaclean"];
+
+/// 请一个进程退出，不强杀。有界面的应用和按 ⌘Q 一样（有没保存的内容时它会先问用户）；
+/// 没界面的后台进程才发终止信号，让它自己收尾。
 pub fn quit(pid: u32) -> Result<(), String> {
     if pid <= 1 || pid == std::process::id() {
         return Err(t("不能退出这个进程").into());
+    }
+    if crate::apps::request_quit(pid) {
+        return Ok(());
     }
     // SAFETY: 只是向一个进程号发信号；进程不存在或无权限时系统返回错误。
     if unsafe { libc::kill(pid as i32, libc::SIGTERM) } == 0 {

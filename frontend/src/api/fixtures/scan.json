@@ -46,7 +46,7 @@
           "partial": false
         }
       ],
-      "default_selected": true,
+      "default_selected": false,
       "removal": "permanent",
       "needs_admin": false,
       "needs_full_disk_access": true,

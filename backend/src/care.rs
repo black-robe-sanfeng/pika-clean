@@ -19,6 +19,9 @@ pub fn report() -> CareReport {
 
 /// 退出耗电或写盘榜上的应用。名字必须还在后端重新算出的榜上且是 `.app`，进程号由后端查，不信前端传的。
 pub fn quit(name: &str) -> Result<(), String> {
+    if crate::system::KEEP.contains(&name) {
+        return Err(crate::i18n::t("不能退出这个进程").into());
+    }
     let (energy, writes) = crate::metrics::hogs(HOGS);
     let pid = energy.iter().chain(&writes).find(|h| h.app && h.name == name).map(|h| h.pid).ok_or(crate::i18n::t("进程已不在列表里"))?;
     crate::system::quit(pid)

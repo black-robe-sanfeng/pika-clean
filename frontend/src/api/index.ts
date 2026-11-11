@@ -101,6 +101,8 @@ export const api = {
   openFullDiskAccessSettings: () => call<void>('open_full_disk_access_settings'),
   openSponsorPage: () => call<void>('open_sponsor_page'),
   openFeedbackPage: () => call<void>('open_feedback_page'),
+  /** 应用图标的 PNG 字节；取不到时长度为 0 */
+  appIcon: (path: string) => call<ArrayBuffer>('app_icon', { path }),
   adminRun: (task: AdminTask) => call<void>('admin_run', { task }),
   adminPasswordless: () => call<Passwordless>('admin_passwordless'),
   adminPasswordlessSet: (on: boolean) => call<void>('admin_passwordless_set', { on }),

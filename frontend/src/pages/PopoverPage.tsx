@@ -4,8 +4,9 @@ import { AiAnswer } from '../components/AiAnswer';
 import { Icon, type IconName } from '../components/Icon';
 import { bytes, DISK_WARN_PCT, gb, mem, pct, rate, uptime } from '../lib/fmt';
 import { health } from '../lib/health';
-import { tint } from '../lib/tint';
+import { AppIcon } from '../components/AppIcon';
 import { useArmed } from '../lib/useArmed';
+import { KEEP } from '../lib/keep';
 import { t } from '../lib/i18n.ts';
 
 const CPU_POINTS = 12;
@@ -176,7 +177,7 @@ function Processes({ top }: { top: Proc[] }) {
       {rows.map((r) => (
         <Fragment key={r.pid}>
           <div className="pr">
-            <span className={`ic sm ${tint(r.name)}`}>{r.name.charAt(0).toUpperCase()}</span>
+            <AppIcon name={r.name} path={r.app_path} size="sm" />
             {ai ? (
               <button className="pn" onClick={() => setAsked(asked === r.name ? null : r.name)} aria-expanded={asked === r.name}>
                 <span>{r.name}</span>
@@ -198,6 +199,7 @@ function Processes({ top }: { top: Proc[] }) {
             <span className={`num${by === 'mem' ? ' on' : ''}`}>{mem(r.mem_bytes)}</span>
             <span className={`num${by === 'cpu' ? ' on' : ''}${r.cpu_pct > HOT_CPU ? ' hot' : ''}`}>{r.cpu_pct.toFixed(1)}</span>
             <button
+              style={KEEP.has(r.name) ? { visibility: 'hidden' } : undefined}
               className={`x${quit.armed === r.name ? ' armed' : ''}`}
               aria-label={quit.armed === r.name ? t('再点一次，退出 {0}', r.name) : t('退出 {0}', r.name)}
               onClick={() => {
@@ -439,17 +441,18 @@ export function PopoverPage() {
                 ),
               );
             }}
-            title={purge && purge !== 'busy' ? purge : undefined}
+            title={purge && purge !== 'busy' ? purge : t('只清系统的文件缓存，效果有限；想多腾内存，在主窗口的「优化速度」里退出占内存的应用')}
           >
-            {purge === 'busy' ? t('正在释放…') : armed.armed === 'purge' ? t('要输管理员密码，再点一次') : purge || t('释放内存')}
+            {/* 和主窗口的「释放内存」（勾选退出应用）不是一回事，所以不叫同一个名字 */}
+            {purge === 'busy' ? t('正在清理…') : armed.armed === 'purge' ? t('要输管理员密码，再点一次') : purge || t('清文件缓存')}
           </button>
-          <button className="btn gray" disabled={quick === 'checking' || quick === 'busy'} onClick={quickClean} title={t('清掉缓存、日志和废纸篓')}>
+          <button className="btn gray" disabled={quick === 'checking' || quick === 'busy'} onClick={quickClean} title={t('清掉缓存和日志，不碰废纸篓')}>
             {quick === 'checking'
               ? t('正在计算…')
               : quick === 'busy'
                 ? t('正在清理…')
                 : quick === 'ready'
-                  ? t('清掉 {0}？再点一次', bytes(quickBytes))
+                  ? t('清掉 {0} 缓存和日志？再点一次', bytes(quickBytes))
                   : quick || t('快速清理')}
           </button>
           {/* 不指定页面：主窗口停在用户上次看的那页，和菜单栏右键菜单的「打开主窗口」一样 */}

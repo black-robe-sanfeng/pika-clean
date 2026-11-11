@@ -835,7 +835,7 @@ mod tests {
         assert_eq!(v["path"], "~/Library/Caches/com.spotify.client");
         assert_eq!(v["last_used_days_ago"], 2);
 
-        let p = input_for_process(&Proc { name: "Docker".into(), pid: 42, mem_bytes: 5, cpu_pct: 1.26 });
+        let p = input_for_process(&Proc { name: "Docker".into(), pid: 42, mem_bytes: 5, cpu_pct: 1.26, app_path: None });
         assert_eq!(keys(&p), ["cpu_pct", "memory", "name"]);
 
         let s = input_for_scan(&ScanReport { categories: vec![cat], ..Default::default() }, home);
@@ -1132,7 +1132,7 @@ mod tests {
         let care = crate::model::CareReport {
             battery: None,
             disk: crate::model::DiskCare { used_bytes: 400_000_000_000, total_bytes: 500_000_000_000, smart: None },
-            energy: vec![crate::model::Hog { name: "Chrome".into(), pid: 1, value: 9, app: true }],
+            energy: vec![crate::model::Hog { name: "Chrome".into(), pid: 1, value: 9, app: true, app_path: None }],
             writes: vec![],
         };
         let month = crate::model::JournalSummary { cleaned_bytes: 3_000_000_000, uninstalled: 2, optimized: 0 };

@@ -43,7 +43,7 @@ export function useDevEnv(stamp: unknown) {
       setPicked(new Set(r.simulators?.devices.some((d) => !d.available) ? ['sim_unavailable'] : []));
     });
   }, [stamp, reloads]);
-  if (!report) return { report, chosen: [] as DevRow[], groups: 0, picked, pick, open, setOpen, reload, rows: null };
+  if (!report) return { report, chosen: [] as DevRow[], total: 0, groups: 0, picked, pick, open, setOpen, reload, rows: null };
   const { docker, simulators: sims } = report;
 
   const dockerRows: DevRow[] =
@@ -74,6 +74,8 @@ export function useDevEnv(stamp: unknown) {
   return {
     report,
     chosen,
+    /** 能清的总共多大，算进结果页顶部的「发现 X 可清理」 */
+    total: all.reduce((s, r) => s + r.bytes, 0),
     // 底部「已选 N 类」：Docker、模拟器各算一类
     groups: new Set(chosen.map((r) => (r.key.startsWith('docker') ? 'docker' : 'sims'))).size,
     picked,

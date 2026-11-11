@@ -4,7 +4,7 @@ import { AiAnswer } from '../components/AiAnswer';
 import { Icon } from '../components/Icon';
 import { toast } from '../components/Toast';
 import { bytes, pct } from '../lib/fmt';
-import { tint } from '../lib/tint';
+import { AppIcon } from '../components/AppIcon';
 import { useArmed } from '../lib/useArmed';
 import { t } from '../lib/i18n.ts';
 
@@ -76,10 +76,11 @@ function DiskCard({ r }: { r: CareReport }) {
       <div className="group mem">
         <Gauge value={s?.health_pct} />
         <div className="grow" style={{ gap: 6 }}>
-          <span className="num">{s ? big(s.written_bytes) : '—'}</span>
-          <small>{s ? t('累计写入 · 累计读取 {0}', big(s.read_bytes)) : t('读不到硬盘健康信息')}</small>
+          {/* 大数字是累计写入量，不是容量，所以把「写入」两个字放进数字里 */}
+          <span className="num">{s ? t('写入 {0}', big(s.written_bytes)) : '—'}</span>
+          <small>{s ? t('累计读取 {0}', big(s.read_bytes)) : t('读不到硬盘健康信息')}</small>
           {s && <small>{t('通电 {0} 小时', s.power_on_hours)}</small>}
-          <small>{[total_bytes > 0 && t('剩余 {0}%', freePct), s?.temp_c != null && `${s.temp_c}°C`].filter(Boolean).join(' · ')}</small>
+          <small>{[total_bytes > 0 && t('剩余空间 {0}%', freePct), s?.temp_c != null && `${s.temp_c}°C`].filter(Boolean).join(' · ')}</small>
         </div>
       </div>
       <div className="gh">{t('保养建议')}</div>
@@ -96,9 +97,7 @@ function HogList({ list, label, reload }: { list: Hog[]; label?: (h: Hog) => str
     <div className="group" data-empty={t('没有读到数据')}>
       {list.map((h) => (
         <div className="row" key={h.pid}>
-          <span className={`ic ${tint(h.name)}`} aria-hidden="true">
-            {h.name.charAt(0).toUpperCase()}
-          </span>
+          <AppIcon name={h.name} path={h.app_path} />
           <span className="grow">
             <span>{h.name}</span>
             <div className="meter" style={{ '--p': pct(h.value, max) } as CSSProperties}>
@@ -124,11 +123,21 @@ export function CarePage({ active }: { active: boolean }) {
   const [r, setR] = useState<CareReport | null>(null);
   const ai = useAiAvailable();
   const [checkup, setCheckup] = useState(false);
-  // 和优化页一样：切回来时距上次读超过 30 秒就重读
+  const [failed, setFailed] = useState(false);
+  // 和优化页一样：切回来时距上次成功读取超过 30 秒就重读；读失败的下次切回来还会再读
   const last = useRef(0);
   const load = () => {
-    last.current = Date.now();
-    api.careReport().then(setR, (e) => toast(String(e)));
+    setFailed(false);
+    api.careReport().then(
+      (x) => {
+        last.current = Date.now();
+        setR(x);
+      },
+      (e) => {
+        setFailed(true);
+        toast(String(e));
+      },
+    );
   };
   useEffect(() => {
     if (active && Date.now() - last.current >= 30_000) load();
@@ -153,7 +162,18 @@ export function CarePage({ active }: { active: boolean }) {
         </div>
       )}
       {!r ? (
-        <div className="group" data-empty={t('正在读取…')} />
+        failed ? (
+          <div className="group">
+            <div className="row">
+              <span className="grow">{t('没能读到电池和硬盘的信息')}</span>
+              <button className="btn sm gray" onClick={load}>
+                {t('重试')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="group" data-empty={t('正在读取…')} />
+        )
       ) : (
         <div className="cols optimize-grid">
           <div className="opt-column">

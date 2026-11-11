@@ -10,7 +10,7 @@ import { Icon, Tile } from '../components/Icon';
 import { Sheet } from '../components/Sheet';
 import { toast } from '../components/Toast';
 import { CATEGORY, cleanable, cleanableBytes, REMOVAL } from '../lib/categories';
-import { Insights, SummaryButton, useSummary } from './ScanPage';
+import { Insights, SummaryButton, Trend, useSummary, Week } from './ScanPage';
 import { ago, bytes } from '../lib/fmt';
 import { t } from '../lib/i18n.ts';
 import { categoryAt, devGroupAt } from '../lib/jump.ts';
@@ -283,9 +283,9 @@ function TrashedSheet({ open, list, onChange, onClose }: { open: boolean; list: 
 /**
  * 智能扫描的结果：可清理的类别列表、逐个挑文件、确认后清理。重新扫描期间列表留着不闪。
  */
-/** onRescan：用户点「返回」，回到首页的大按钮。清理后不整份重扫，后端会发来改好的报告 */
+/** onRescan：重新扫描，扫描时旧列表留着；onCancel：扫描中途取消；onBack：回到首页的大按钮。清理后不整份重扫，后端会发来改好的报告 */
 /** focus：从空间去向点「去清理」过来的位置，打开它所在的类别或开发环境那一组 */
-export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan: () => void; focus?: { path: string } | null }) {
+export function CleanPage({ scan, onRescan, onCancel, onBack, focus }: { scan: ScanState; onRescan: () => void; onCancel: () => void; onBack: () => void; focus?: { path: string } | null }) {
   const summary = useSummary(scan);
   // 重新扫描期间沿用上一份报告，列表不闪
   const last = useRef<ScanReport | null>(null);
@@ -315,6 +315,8 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
   const [stale, setStale] = useState<LoginItem[]>([]);
   const [offStale, setOffStale] = useState(true);
   const ai = useAiAvailable();
+  // 「让 AI 勾选」点了才展开输入框，免得挡住下面的列表
+  const [asking, setAsking] = useState(false);
   // 开发环境（Docker、模拟器）用它们自己的命令清理，但和上面的类别一起算进底部的总数、一起清。
   // 只在完整扫描后重新读；清理后只改了报告的那几次不读
   const devStamp = useRef<ScanReport | null>(null);
@@ -368,9 +370,10 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
 
   const cats = report.categories;
   const scanning = scan.phase === 'run';
-  const total = cleanableBytes(cats);
-  // 默认勾选的那部分有多大（个人文件不在其中）
-  const defaultBytes = cats.filter((c) => cleanable(c) && c.default_selected).reduce((n, c) => n + sizeOf(can(c)), 0);
+  // 和下面列表、底部总数一致：Docker、模拟器也算在内
+  const total = cleanableBytes(cats) + dev.total;
+  // 启动时读回的上次结果放了一天以上：标题不说「扫描完成」，免得当成刚扫的
+  const old = !scanning && Date.now() - (report.at_ms ?? Date.now()) > 86_400_000;
   // 每个类别里勾了哪些条目；一条都没勾的类别不算
   const chosen = cats.map((c) => ({ c, items: c.items.filter((i) => picked.has(i.id)) })).filter((x) => x.items.length > 0);
   const devBytes = dev.chosen.reduce((s, r) => s + r.bytes, 0);
@@ -434,7 +437,8 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
         setResult(all);
       } else {
         const freed = all.estimated ? t('约 {0}', bytes(all.freed_bytes)) : bytes(all.freed_bytes);
-        toast(all.trashed_bytes > 0 ? t('清理完成，已释放 {0}，另有 {1} 移到了废纸篓', freed, bytes(all.trashed_bytes)) : t('清理完成，已释放 {0}', freed));
+        if (stopping.current) toast(t('已停止，已释放 {0}', freed));
+        else toast(all.trashed_bytes > 0 ? t('清理完成，已释放 {0}，另有 {1} 移到了废纸篓', freed, bytes(all.trashed_bytes)) : t('清理完成，已释放 {0}', freed));
       }
     }
     // 不整份重扫：后端已经把删掉的条目从报告里去掉，有东西进了废纸篓时只重扫「废纸篓」这一类
@@ -465,11 +469,28 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
     <>
       <div className="scroll hasbar">
         <h1 className="title-row">
-          {scanning ? t('正在扫描…') : t('扫描完成')}
+          {scanning ? t('正在扫描…') : old ? t('上次扫描的结果') : t('扫描完成')}
           {!scanning && total > 0 && <SummaryButton summary={summary} show={summary.show} />}
-          <button className="btn sm" disabled={scanning || busy} onClick={onRescan}>
-            {t('返回')}
-          </button>
+          {ai && !asking && !scanning && total > 0 && (
+            <button className="pill" onClick={() => setAsking(true)}>
+              <Icon name="scan" />
+              {t('让 AI 勾选')}
+            </button>
+          )}
+          {scanning ? (
+            <button className="btn sm gray" onClick={onCancel}>
+              {t('取消')}
+            </button>
+          ) : (
+            <>
+              <button className={`btn sm${old ? '' : ' gray'}`} disabled={busy} onClick={onRescan}>
+                {t('重新扫描')}
+              </button>
+              <button className="btn sm gray" disabled={busy} onClick={onBack}>
+                {t('返回')}
+              </button>
+            </>
+          )}
         </h1>
         <p>
           {scan.phase === 'run'
@@ -478,16 +499,20 @@ export function CleanPage({ scan, onRescan, focus }: { scan: ScanState; onRescan
               : t('准备中')
             : total === 0
               ? t('没有发现可清理的内容')
-              : t('发现 {0} 可清理空间{1}', bytes(total), defaultBytes < total ? t('，其中 {0} 已默认勾选', bytes(defaultBytes)) : '')}
+              : t('发现 {0} 可清理空间', bytes(total))}
           {!scanning && report?.at_ms ? ` · ${t('扫描于 {0}', new Date(report.at_ms).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}` : ''}
         </p>
         <Insights open={summary.open} />
         <Storage cleanBytes={total} />
-        {ai && (
+        {/* 扫过一次以后打开就是这一页，用量趋势和近 7 天放这里才看得到 */}
+        <div className="trend">
+          <Trend />
+          <Week />
+        </div>
+        {ai && asking && (
           <AskClean
             categories={cats}
             disabled={busy || scanning}
-            onPlan={(ids) => pickCategories((c) => ids.includes(c.id))}
             onApply={(ids) => {
               pickCategories((c) => ids.includes(c.id));
               setConfirming(true);
