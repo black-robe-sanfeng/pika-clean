@@ -181,6 +181,8 @@ fn lossy<S: serde::Serializer>(p: &std::path::Path, s: S) -> Result<S::Ok, S::Er
 pub enum CategoryId {
     AppCache,
     SystemCache,
+    /// 所有用户共用的系统日志（`/Library/Logs`），含崩溃报告。删掉后系统会自己重建
+    SystemLogs,
     Trash,
     OldDownloads,
     Logs,
@@ -356,6 +358,10 @@ pub struct AppInfo {
     pub version: String,
     #[serde(serialize_with = "lossy")]
     pub path: std::path::PathBuf,
+    /// 应用目录里指向 `path` 的符号链接。有些软件（企业 VPN、安全客户端）把包装在 `/Library` 里，
+    /// 应用目录里只放一个链接；卸载时链接和真实位置要一起移走。前端用不到，不序列化
+    #[serde(skip)]
+    pub link: Option<std::path::PathBuf>,
     pub size_bytes: u64,
     pub last_used_ms: Option<u64>,
     /// 应用包的创建时间，大致是装上的时间；读不到时为空

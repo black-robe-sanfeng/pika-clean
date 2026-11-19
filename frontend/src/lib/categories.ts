@@ -6,6 +6,7 @@ import { t } from './i18n.ts';
 export const CATEGORY: Record<CategoryId, { name: string; desc: string; icon: IconName; color: string }> = {
   app_cache: { name: t('应用缓存'), desc: t('第三方应用的缓存，用到时会重新生成'), icon: 'box', color: '' },
   system_cache: { name: t('系统缓存'), desc: t('所有用户共用的缓存'), icon: 'chip', color: 'c-gray' },
+  system_logs: { name: t('系统日志'), desc: t('所有用户共用的日志，含崩溃报告，只在排查问题时有用'), icon: 'doc', color: 'c-teal' },
   trash: { name: t('废纸篓'), desc: t('已删除但仍占用空间的文件'), icon: 'trash', color: 'c-red' },
   old_downloads: { name: t('旧下载文件'), desc: t('超过 90 天没有打开过，建议先查看'), icon: 'down', color: 'c-orange' },
   logs: { name: t('日志文件'), desc: t('系统与应用的运行日志'), icon: 'doc', color: 'c-teal' },

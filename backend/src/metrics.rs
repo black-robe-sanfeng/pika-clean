@@ -274,33 +274,50 @@ fn swap_usage() -> (u64, u64) {
     if ok { (xsw.xsu_used, xsw.xsu_total) } else { (0, 0) }
 }
 
-/// 已用内存，口径与「活动监视器」的「已使用内存」一致：应用内存 + 联动内存 + 被压缩内存。
-/// 读取失败时返回 None，由调用方退回 sysinfo 的数值。
-fn mem_used_bytes() -> Option<u64> {
+/// 向内核要 vm_statistics64 时给的缓冲区大小，单位是 integer_t。
+///
+/// 不能直接用 `libc::HOST_VM_INFO64_COUNT`（=104）：那个值是按编译时的 SDK 算的，
+/// 而内核只按自己那一版结构体填。SDK 比运行的系统新时，要 104 会让内核在日志里报
+/// `host_statistics64() count is larger than expected (actual:104 > HOST_VM_INFO64_COUNT:62)
+/// ... likely to result in memory corruption`。
+///
+/// 62 是 macOS 一直以来的 `vm_statistics64` 字数（248 字节），也是内核自己认的上限。
+/// 要比本函数实际读的字段更大：最靠后的是 `internal_page_count`（第 36 个字）。
+/// 调用后还会核对内核实际填了多少，填不满就当读失败，不拿残值算数。
+const VM_STATS_COUNT: u32 = 62;
+
+/// 本函数要读的字段占到的字数（`internal_page_count` 结束于第 36 个 integer_t）。
+/// 内核填得比这少就说明这一版结构体和预期不符。
+const VM_STATS_FIELDS: u32 = 36;
+
+/// 读一次 vm_statistics64。失败或内核填的字段不够时返回 None。
+fn vm_stats() -> Option<libc::vm_statistics64> {
     let mut stats: libc::vm_statistics64 = unsafe { std::mem::zeroed() };
-    let mut count = (std::mem::size_of::<libc::vm_statistics64>() / std::mem::size_of::<libc::integer_t>()) as u32;
-    // SAFETY: stats 和 count 是本函数的局部变量，count 按内核要求以 integer_t 为单位给出缓冲区大小。
+    let mut count = VM_STATS_COUNT;
+    // SAFETY: stats 是本函数的局部变量，缓冲区至少 VM_STATS_COUNT 个 integer_t 大小
+    // （结构体共 104 个字），count 按内核要求以 integer_t 为单位给出。
     #[allow(deprecated)]
     let ok = unsafe {
         libc::host_statistics64(libc::mach_host_self(), libc::HOST_VM_INFO64, (&mut stats as *mut libc::vm_statistics64).cast(), &mut count)
     } == libc::KERN_SUCCESS;
+    (ok && count >= VM_STATS_FIELDS).then_some(stats)
+}
+
+/// 已用内存，口径与「活动监视器」的「已使用内存」一致：应用内存 + 联动内存 + 被压缩内存。
+/// 读取失败时返回 None，由调用方退回 sysinfo 的数值。
+fn mem_used_bytes() -> Option<u64> {
+    let stats = vm_stats()?;
     let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as u64;
     let app = (stats.internal_page_count as u64).saturating_sub(stats.purgeable_count as u64);
-    ok.then(|| (app + stats.wire_count as u64 + stats.compressor_page_count as u64) * page)
+    Some((app + stats.wire_count as u64 + stats.compressor_page_count as u64) * page)
 }
 
 /// 此刻的空闲内存（空闲页 + 预读页，系统随时能直接拿来用的部分）。「释放内存」前后各量一次，两者之差就是实际腾出了多少：
 /// 退出应用腾出的应用内存、清掉的文件缓存都会落到这里。
 pub fn free_mem_bytes() -> Option<u64> {
-    let mut stats: libc::vm_statistics64 = unsafe { std::mem::zeroed() };
-    let mut count = (std::mem::size_of::<libc::vm_statistics64>() / std::mem::size_of::<libc::integer_t>()) as u32;
-    // SAFETY: 同 mem_used_bytes
-    #[allow(deprecated)]
-    let ok = unsafe {
-        libc::host_statistics64(libc::mach_host_self(), libc::HOST_VM_INFO64, (&mut stats as *mut libc::vm_statistics64).cast(), &mut count)
-    } == libc::KERN_SUCCESS;
+    let stats = vm_stats()?;
     let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as u64;
-    ok.then(|| (stats.free_count as u64 + stats.speculative_count as u64) * page)
+    Some((stats.free_count as u64 + stats.speculative_count as u64) * page)
 }
 
 /// 启动盘的容量和已用空间。APFS 下 "/" 报告的是整个容器的数字。

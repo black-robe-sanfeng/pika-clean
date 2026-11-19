@@ -36,6 +36,10 @@ const LEFTOVER_DIRS: [&str; 10] = [
 /// 系统保护的文件带这个标记，删不掉，也不该出现在卸载列表里。
 const SF_RESTRICTED: u32 = 0x0008_0000;
 
+/// 应用目录往下最多看几层：厂商常自己建一层文件夹放应用（iNode、Unity、Python 安装器）。
+/// 再深就是应用包内部带的助手程序了，不算单独安装的应用。
+const APP_SCAN_DEPTH: usize = 3;
+
 pub struct Roots {
     /// 存放应用的目录
     pub apps: Vec<PathBuf>,
@@ -117,7 +121,10 @@ fn app_groups(app: &Path) -> Vec<String> {
 
 /// 一个已安装的应用包里、认残留要用的信息。必须在应用被移走之前读。
 pub struct Bundle {
+    /// 应用包的真实位置。应用目录里的符号链接已经解析掉。
     pub path: PathBuf,
+    /// 应用目录里指向这个包的符号链接（有的话）。有些软件把包装在 `/Library` 里，应用目录里只放一个链接
+    pub link: Option<PathBuf>,
     pub bundle_id: String,
     pub version: String,
     pub name: String,
@@ -131,8 +138,8 @@ pub struct Bundle {
     admin: Vec<PathBuf>,
 }
 
-/// 读一个应用包。读不出包标识的不认。
-fn read_bundle(path: &Path, system_library: &Path) -> Option<Bundle> {
+/// 读一个应用包。读不出包标识的不认。`link` 是应用目录里指向它的符号链接（有的话）。
+fn read_bundle(path: &Path, link: Option<PathBuf>, system_library: &Path) -> Option<Bundle> {
     let dict = read_plist(path)?;
     let bundle_id = id_in(&dict)?;
     let version = dict.get("CFBundleShortVersionString").and_then(|v| v.as_string()).unwrap_or_default().to_owned();
@@ -147,11 +154,80 @@ fn read_bundle(path: &Path, system_library: &Path) -> Option<Bundle> {
         extra_ids: extra_ids(path),
         groups: app_groups(path),
         path: path.to_path_buf(),
+        link,
         bundle_id,
         version,
         agents: vec![],
         admin,
     })
+}
+
+/// 名字像应用包（`.app` 结尾，不分大小写）。
+fn app_name(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e.to_string_lossy().eq_ignore_ascii_case("app"))
+}
+
+/// 这个包是不是另一个应用包里带的助手（`Unity.app/Contents/Helpers/Unity Bug Reporter.app`）：那种不算单独安装的应用。
+fn inside_bundle(path: &Path) -> bool {
+    path.ancestors().skip(1).any(|a| a.extension().is_some_and(|e| e == "app"))
+}
+
+/// 应用包里一定有 `Contents/Info.plist`。用它认出改了名的包（比如 Homebrew 留下的
+/// `iTerm.app.homebrew-…`），这种目录往里走只会捡到包内的助手程序。
+fn bundle_like(dir: &Path) -> bool {
+    app_name(dir) || dir.join("Contents/Info.plist").is_file()
+}
+
+/// 应用目录里的全部应用包：真实位置 + 应用目录里指向它的符号链接。
+///
+/// 三件事都不能漏：
+/// - 有些软件（企业 VPN、安全客户端）把包装在 `/Library` 里，应用目录里只放一个链接（`aTrust.app`）。
+///   不解析链接就永远看不见它。
+/// - 厂商常自己建一层文件夹放应用（`/Applications/iNodeClient/iNodeClient.app`），只读第一层会漏掉。
+/// - 系统应用（`/Applications/Safari.app` 是链接，指向 `restricted` 的 `/System`）不算用户装的，不列。
+fn app_bundles(roots: &Roots) -> Vec<(PathBuf, Option<PathBuf>)> {
+    fn walk(dir: &Path, depth: usize, out: &mut Vec<(PathBuf, Option<PathBuf>)>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+            let Ok(kind) = entry.file_type() else { continue };
+            if kind.is_symlink() {
+                // 链接可能就是这个应用在应用目录里唯一的痕迹，所以跟着它走，但只认指向应用包的
+                let Ok(real) = std::fs::canonicalize(&path) else { continue };
+                if app_name(&path) && real.is_dir() && app_name(&real) && !inside_bundle(&real) && !real.starts_with("/System") {
+                    out.push((real, Some(path)));
+                }
+                continue;
+            }
+            if !kind.is_dir() || name.starts_with('.') {
+                continue;
+            }
+            if bundle_like(&path) {
+                if app_name(&path) {
+                    out.push((path, None));
+                }
+                continue;
+            }
+            if depth < APP_SCAN_DEPTH {
+                walk(&path, depth + 1, out);
+            }
+        }
+    }
+
+    let mut out: Vec<(PathBuf, Option<PathBuf>)> = Vec::new();
+    for root in &roots.apps {
+        walk(root, 1, &mut out);
+    }
+    // 同一个包既有链接又直接装在里面时只留一条，记着那个链接
+    let mut unique: Vec<(PathBuf, Option<PathBuf>)> = Vec::new();
+    for (real, link) in out {
+        match unique.iter_mut().find(|(p, _)| *p == real) {
+            Some(slot) => slot.1 = slot.1.take().or(link),
+            None => unique.push((real, link)),
+        }
+    }
+    unique
 }
 
 /// 一个目录里的启动项配置文件 → 它启动的程序（`Program`，没有时取 `ProgramArguments` 的第一项）。
@@ -181,20 +257,16 @@ fn par_map<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> R + Sync) -> Vec<R> 
 /// 应用目录里装着的全部应用包，包括列表里不显示的（系统保护的、本应用自己、符号链接）：
 /// 判断残留是不是和别的应用共用时，它们都要算上。读签名每个要几十毫秒，所以分几个线程读。
 pub fn installed(roots: &Roots) -> Vec<Bundle> {
-    let paths: Vec<PathBuf> = roots
-        .apps
-        .iter()
-        .filter_map(|root| std::fs::read_dir(root).ok())
-        .flat_map(|entries| entries.flatten().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "app"))
-        .collect();
-    let mut all: Vec<Bundle> = par_map(&paths, |p| read_bundle(p, &roots.system_library)).into_iter().flatten().collect();
+    let found = app_bundles(roots);
+    let mut all: Vec<Bundle> = par_map(&found, |(real, link)| read_bundle(real, link.clone(), &roots.system_library)).into_iter().flatten().collect();
     // 启动项只认「启动的程序就在这个应用包里」的，不按标签的前缀猜（com.google.Chrome.canary 是另一个应用）
     let user_jobs = launchd_jobs(&roots.library.join("LaunchAgents"));
     let system_jobs: Vec<_> = ["LaunchAgents", "LaunchDaemons"].iter().flat_map(|d| launchd_jobs(&roots.system_library.join(d))).collect();
     for b in &mut all {
-        b.agents = user_jobs.iter().filter(|(_, program)| program.starts_with(&b.path)).map(|(plist, _)| plist.clone()).collect();
-        b.admin.extend(system_jobs.iter().filter(|(_, program)| program.starts_with(&b.path)).map(|(plist, _)| plist.clone()));
+        // 启动项里写的可能是应用目录里的链接，也可能是真实位置（`/Library/sangfor/...`），两个都认
+        let inside = |program: &Path| program.starts_with(&b.path) || b.link.as_ref().is_some_and(|l| program.starts_with(l));
+        b.agents = user_jobs.iter().filter(|(_, program)| inside(program)).map(|(plist, _)| plist.clone()).collect();
+        b.admin.extend(system_jobs.iter().filter(|(_, program)| inside(program)).map(|(plist, _)| plist.clone()));
     }
     all
 }
@@ -257,7 +329,8 @@ pub fn leftovers_of(roots: &Roots, all: &[Bundle], i: usize) -> (Vec<PathBuf>, V
 /// 新版还装着时，什么都不会列出来。
 pub fn trashed_leftovers(roots: &Roots, app: &Path) -> Option<(String, Vec<PathBuf>)> {
     let mut all = installed(roots);
-    all.push(read_bundle(app, &roots.system_library)?);
+    // 已经进了废纸篓的应用不再是应用目录里的链接，真实位置就是它自己
+    all.push(read_bundle(app, None, &roots.system_library)?);
     let i = all.len() - 1;
     let (mine, _) = leftovers_of(roots, &all, i);
     Some((all[i].name.clone(), mine))
@@ -417,13 +490,14 @@ fn parse_date(s: &str) -> Option<u64> {
 /// 列出可以卸载的应用，按大小降序。残留文件只找出来，不量大小（见 [`measure`]）。
 /// `index` 和 `running` 由调用方提供，正式运行时查系统，测试时传假的。
 pub fn list(roots: &Roots, index: &dyn Fn(&[PathBuf]) -> HashMap<PathBuf, Indexed>, running: &(dyn Fn(&Path) -> (bool, Vec<String>) + Sync)) -> Vec<AppInfo> {
-    let own = std::env::current_exe().ok();
+    // 本应用自己的真实位置：应用目录里是链接时 `current_exe` 拿到的是真实路径
+    let own = std::env::current_exe().ok().and_then(|exe| exe.canonicalize().ok());
     let all = installed(roots);
-    // 符号链接、系统保护的应用、本应用自己，都不列
+    // 系统保护的应用、本应用自己，都不列。应用目录里的链接已经解析过，`path` 是真实位置
     let found: Vec<usize> = (0..all.len())
         .filter(|&i| {
             let path = &all[i].path;
-            path.symlink_metadata().is_ok_and(|meta| meta.is_dir() && meta.st_flags() & SF_RESTRICTED == 0) && !own.as_ref().is_some_and(|exe| exe.starts_with(path))
+            path.metadata().is_ok_and(|meta| meta.is_dir() && meta.st_flags() & SF_RESTRICTED == 0) && !own.as_ref().is_some_and(|exe| exe.starts_with(path))
         })
         .collect();
     let paths: Vec<PathBuf> = found.iter().map(|&i| all[i].path.clone()).collect();
@@ -454,6 +528,7 @@ pub fn list(roots: &Roots, index: &dyn Fn(&[PathBuf]) -> HashMap<PathBuf, Indexe
             name: b.name.clone(),
             bundle_id: b.bundle_id.clone(),
             version: b.version.clone(),
+            link: b.link.clone(),
             path: path.clone(),
         }
     });
@@ -627,6 +702,67 @@ mod tests {
         let t = TempTree::new();
         let (_, roots) = fake_app(&t, "Evil", "../../etc");
         assert!(list(&roots, &|_| HashMap::new(), &|_| (false, vec![])).is_empty());
+    }
+
+    /// 厂商把包装在资源库里、应用目录里只放一个链接（aTrust 就是这样）：要能列出来，
+    /// 路径用真实位置，并且记着那个链接，卸载时两个一起移走。
+    #[test]
+    fn 应用目录里的链接指向包装在别处时也能列出来() {
+        let t = TempTree::new();
+        let roots = Roots { apps: vec![t.0.join("Applications")], library: t.0.join("Library"), system_library: t.0.join("SystemLibrary") };
+        let real = t.0.join("Vendor/SDP/aTrust.app");
+        write_plist(&real.join("Contents/Info.plist"), vec![("CFBundleIdentifier", plist::Value::String("com.electron.atrust".into()))]);
+        std::fs::create_dir_all(t.0.join("Applications")).unwrap();
+        std::os::unix::fs::symlink(&real, t.0.join("Applications/aTrust.app")).unwrap();
+
+        let all = installed(&roots);
+        assert_eq!((all.len(), all[0].path.clone(), all[0].link.clone()), (1, real.clone(), Some(t.0.join("Applications/aTrust.app"))));
+        let apps = list(&roots, &|_| HashMap::new(), &|_| (false, vec![]));
+        assert_eq!((apps.len(), apps[0].name.as_str(), apps[0].bundle_id.as_str()), (1, "aTrust", "com.electron.atrust"));
+        assert_eq!(apps[0].path, real, "列表里给的是真实位置，不是那个链接");
+    }
+
+    /// 系统应用的链接（`/Applications/Safari.app` → `/System/...`）不算用户装的，不能列出来。
+    #[test]
+    fn 指向系统自带应用的链接不列() {
+        let t = TempTree::new();
+        let roots = Roots { apps: vec![t.0.join("Applications")], library: t.0.join("Library"), system_library: t.0.join("SystemLibrary") };
+        std::fs::create_dir_all(t.0.join("Applications")).unwrap();
+        // 临时目录造不出 /System，用一个真实存在的系统应用来测
+        let safari = Path::new("/System/Applications/Calculator.app");
+        std::os::unix::fs::symlink(safari, t.0.join("Applications/Calculator.app")).unwrap();
+        assert!(installed(&roots).is_empty());
+    }
+
+    /// 厂商自己建文件夹放应用（`/Applications/iNodeClient/iNodeClient.app`），只读第一层会漏掉。
+    #[test]
+    fn 厂商子文件夹里的应用也列出来() {
+        let t = TempTree::new();
+        let roots = Roots { apps: vec![t.0.join("Applications")], library: t.0.join("Library"), system_library: t.0.join("SystemLibrary") };
+        let app = t.0.join("Applications/iNodeClient/iNodeClient.app");
+        write_plist(&app.join("Contents/Info.plist"), vec![("CFBundleIdentifier", plist::Value::String("com.example.inode".into()))]);
+        let apps = list(&roots, &|_| HashMap::new(), &|_| (false, vec![]));
+        assert_eq!((apps.len(), apps[0].path.clone()), (1, app));
+    }
+
+    /// 应用包里带的助手不算单独安装的应用，改了名的旧版目录也不往里挖：
+    /// 往里挖只会把 `Unity Bug Reporter`、`iTerm2ImportStatus` 这种列成用户可以卸载的应用。
+    #[test]
+    fn 包里的助手和改名备份目录里的_都不单独列() {
+        let t = TempTree::new();
+        let roots = Roots { apps: vec![t.0.join("Applications")], library: t.0.join("Library"), system_library: t.0.join("SystemLibrary") };
+        let unity = t.0.join("Applications/Unity/Unity-6000/Unity.app");
+        write_plist(&unity.join("Contents/Info.plist"), vec![("CFBundleIdentifier", plist::Value::String("com.unity3d.UnityEditor5.x".into()))]);
+        let helper = unity.join("Contents/Helpers/Unity Bug Reporter.app");
+        write_plist(&helper.join("Contents/Info.plist"), vec![("CFBundleIdentifier", plist::Value::String("com.unity3d.bugreporter".into()))]);
+        std::os::unix::fs::symlink(&helper, t.0.join("Applications/Unity/Unity-6000/Unity Bug Reporter.app")).unwrap();
+        // Homebrew 更新失败留下的改名备份：里面有 Contents/Info.plist，不该再往里找
+        let backup = t.0.join("Applications/iTerm.app.homebrew-old/Contents/MacOS/iTerm2ImportStatus.app");
+        write_plist(&backup.join("Contents/Info.plist"), vec![("CFBundleIdentifier", plist::Value::String("com.googlecode.iterm2.iTerm2ImportStatus".into()))]);
+        write_plist(&t.0.join("Applications/iTerm.app.homebrew-old/Contents/Info.plist"), vec![("CFBundleIdentifier", plist::Value::String("com.googlecode.iterm2".into()))]);
+
+        let apps = list(&roots, &|_| HashMap::new(), &|_| (false, vec![]));
+        assert_eq!(apps.iter().map(|a| a.bundle_id.as_str()).collect::<Vec<_>>(), ["com.unity3d.UnityEditor5.x"]);
     }
 
     #[test]

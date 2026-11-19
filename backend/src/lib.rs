@@ -19,6 +19,7 @@ pub mod permissions;
 pub mod plugins;
 pub mod similar;
 pub mod remove;
+pub mod single_instance;
 pub mod scan;
 pub mod sensors;
 pub mod space;
@@ -199,6 +200,11 @@ fn context() -> tauri::Context {
 }
 
 pub fn run() {
+    // 最先做：登录时「开机自启」和系统「登录项」会各拉起一份，第二份必须在这里就退出，
+    // 否则它会一路建出第二个菜单栏图标。
+    let Some(_instance_lock) = single_instance::acquire() else {
+        return;
+    };
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

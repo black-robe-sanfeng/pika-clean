@@ -25,7 +25,7 @@ pub enum Mode {
 /// 能重新生成的直接删，否则不释放空间；个人文件进废纸篓，留一次反悔的机会。
 pub fn mode_of(id: CategoryId) -> Mode {
     match id {
-        CategoryId::AppCache | CategoryId::SystemCache | CategoryId::Logs | CategoryId::DevCache | CategoryId::AiCache | CategoryId::Trash | CategoryId::CrashDumps => Mode::Permanent,
+        CategoryId::AppCache | CategoryId::SystemCache | CategoryId::SystemLogs | CategoryId::Logs | CategoryId::DevCache | CategoryId::AiCache | CategoryId::Trash | CategoryId::CrashDumps => Mode::Permanent,
         // 固件可以重新下载；Homebrew 旧版本是 brew 自己认定可以删的
         CategoryId::IosFirmware | CategoryId::HomebrewOld => Mode::Permanent,
         // 个人文件和项目目录只进废纸篓（规格 D-12）
@@ -416,16 +416,25 @@ pub fn uninstall(app: &AppInfo, roots: &Roots, dry_run: bool) -> RemoveResult {
     })
 }
 
-/// 卸载的守卫。应用必须直接位于某个应用目录下；残留必须是按应用包重新算出来、而且不和别的已装应用共用的路径之一。
+/// 卸载的守卫。应用必须位于某个应用目录下（直接放在里面、放在厂商自己建的子文件夹里，
+/// 或者应用目录里放着指向它的链接）；残留必须是按应用包重新算出来、而且不和别的已装应用共用的路径之一。
 fn uninstall_targets(app: &AppInfo, roots: &Roots) -> Result<Vec<(std::path::PathBuf, u64)>, String> {
     if app.running {
         return Err(t("应用没有退出（可能有没保存的内容），请手动退出后再卸载").into());
     }
     let canon = |p: &Path| fs::canonicalize(p).ok();
-    let parent = app.path.parent().and_then(canon).ok_or(t("应用已不存在"))?;
-    let in_apps_dir = roots.apps.iter().filter_map(|r| canon(r)).any(|r| r == parent);
+    // 应用目录：`/Applications` 这些根目录本身
+    let app_dirs: Vec<std::path::PathBuf> = roots.apps.iter().filter_map(|r| canon(r)).collect();
+    // 厂商常自己建一层文件夹放应用（`/Applications/iNodeClient/iNodeClient.app`），所以看到应用目录往下三层
+    let in_apps_dir = |p: &Path| {
+        let Some(parent) = p.parent().and_then(canon) else { return false };
+        app_dirs.iter().any(|root| parent.starts_with(root) && parent.strip_prefix(root).is_ok_and(|rel| rel.components().count() <= 2))
+    };
+    // 直接在应用目录里的应用，或应用目录里只放了一个链接、真实包装在别处（企业 VPN、安全客户端常这么做）
+    let direct = in_apps_dir(&app.path);
+    let linked = app.link.as_deref().is_some_and(|l| in_apps_dir(l) && canon(l).is_some_and(|real| real == app.path));
     let is_bundle = app.path.extension().is_some_and(|x| x == "app") && app.path.symlink_metadata().is_ok_and(|m| m.is_dir());
-    if !in_apps_dir || !is_bundle {
+    if !(direct || linked) || !is_bundle {
         return Err(t("路径不在允许卸载的范围内").into());
     }
     // 列表可能是几分钟前的：重新读一遍所有已装的应用，期间新装了同标识的应用也不会误带走它的数据。
@@ -433,7 +442,11 @@ fn uninstall_targets(app: &AppInfo, roots: &Roots) -> Result<Vec<(std::path::Pat
     let all = installed(roots);
     let allowed = all.iter().position(|b| b.path == app.path).map(|i| leftovers_of(roots, &all, i).0).unwrap_or_default();
     let library = canon(&roots.library);
+    // 应用本身：先移真实位置，再移应用目录里那个链接。真实位置没移走时一个都不动
     let mut targets = vec![(app.path.clone(), app.size_bytes)];
+    if let Some(link) = &app.link {
+        targets.push((link.clone(), 0));
+    }
     for l in &app.leftovers {
         // 残留必须在候选名单里，并且它的上级目录解析后仍在资源库之内
         let inside = l.path.parent().and_then(canon).zip(library.as_ref()).is_some_and(|(p, lib)| p.starts_with(lib));
@@ -457,6 +470,13 @@ fn uninstall_with(app: &AppInfo, roots: &Roots, dry_run: bool, trash: &dyn Fn(&P
         match if dry_run { Ok(()) } else { trash(path) } {
             Ok(()) => out.trashed_bytes += size,
             Err(reason) => {
+                // 真实包装在系统目录里（企业 VPN、安全客户端常这么装）时，只有管理员能移走。
+                // 报错原文对用户没用，换成能照着做的说法
+                let reason = if i == 0 && !app.path.parent().is_some_and(|p| roots.apps.iter().any(|root| p.starts_with(root))) && permission_denied(&reason) {
+                    t("它装在系统目录里，请点「在访达中显示」，把它拖到废纸篓并输入密码").to_owned()
+                } else {
+                    reason
+                };
                 out.failed.push(Failure { path: path.clone(), reason });
                 // 应用本身都没移走，就不要去动它的数据了
                 if i == 0 {
@@ -466,6 +486,12 @@ fn uninstall_with(app: &AppInfo, roots: &Roots, dry_run: bool, trash: &dyn Fn(&P
         }
     }
     out
+}
+
+/// 移走失败是不是因为没有权限。系统接口给的说明里，权限问题就是这两种写法。
+fn permission_denied(reason: &str) -> bool {
+    let lower = reason.to_ascii_lowercase();
+    lower.contains("operation not permitted") || lower.contains("permission denied") || reason.contains("不允许")
 }
 
 /// 把已删除应用留下的数据移到废纸篓（规格 D-10、D-12：默认不勾选、标「需确认」、只进废纸篓）。
@@ -543,7 +569,15 @@ mod tests {
     fn fake_trash(dir: PathBuf) -> impl Fn(&Path) -> Result<(), String> {
         move |p| {
             fs::create_dir_all(&dir).unwrap();
-            fs::rename(p, dir.join(p.file_name().unwrap())).map_err(|e| e.to_string())
+            // 和系统一样，废纸篓里已有同名项时加序号：同一个应用的真实包和它在应用目录里的链接同名
+            let name = p.file_name().unwrap().to_string_lossy().into_owned();
+            let mut to = dir.join(&name);
+            let mut i = 2;
+            while to.symlink_metadata().is_ok() {
+                to = dir.join(format!("{name} {i}"));
+                i += 1;
+            }
+            fs::rename(p, to).map_err(|e| e.to_string())
         }
     }
     /// 测试用的删除：没有扫描指纹，没有工具在运行，不该走到管理员那一步。记下的废纸篓位置就是原路径
@@ -746,6 +780,52 @@ mod tests {
         let r = uninstall_with(&listed(&roots), &roots, false, &|_| Err("没有权限".into()));
         assert_eq!((r.trashed_bytes, r.failed.len()), (0, 1));
         assert!(app_path.exists() && cache.exists());
+    }
+
+    /// 包装在资源库里、应用目录里只放一个链接的应用（aTrust 这类企业客户端）：
+    /// 链接和真实位置都要移走，否则访达里还留着一个指向已移走的包的链接。
+    #[test]
+    fn 卸载同时移走应用目录里的链接和真实位置() {
+        let t = TempTree::new();
+        let roots = Roots { apps: vec![t.0.join("Applications")], library: t.0.join("Library"), system_library: t.0.join("SystemLibrary") };
+        let real = t.0.join("Vendor/SDP/aTrust.app");
+        let plist = r#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.electron.atrust</string></dict></plist>"#;
+        std::fs::create_dir_all(real.join("Contents")).unwrap();
+        std::fs::write(real.join("Contents/Info.plist"), plist).unwrap();
+        std::fs::create_dir_all(t.0.join("Applications")).unwrap();
+        let link = t.0.join("Applications/aTrust.app");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        let cache = t.file("Library/Caches/com.electron.atrust/c.bin", 10);
+        let app = listed(&roots);
+
+        let r = uninstall_with(&app, &roots, false, &fake_trash(t.0.join("trash")));
+        assert!(r.failed.is_empty(), "{:?}", r.failed);
+        assert!(!real.exists() && link.symlink_metadata().is_err() && !cache.exists());
+        assert!(t.0.join("trash/aTrust.app").exists());
+    }
+
+    /// 真实包装在系统目录里、没有管理员权限移不走时，不要把系统原文丢给用户。
+    #[test]
+    fn 系统目录里的应用移不走时提示去访达拖() {
+        let t = TempTree::new();
+        let roots = Roots { apps: vec![t.0.join("Applications")], library: t.0.join("Library"), system_library: t.0.join("SystemLibrary") };
+        let real = t.0.join("Vendor/SDP/aTrust.app");
+        let plist = r#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.electron.atrust</string></dict></plist>"#;
+        std::fs::create_dir_all(real.join("Contents")).unwrap();
+        std::fs::write(real.join("Contents/Info.plist"), plist).unwrap();
+        std::fs::create_dir_all(t.0.join("Applications")).unwrap();
+        std::os::unix::fs::symlink(&real, t.0.join("Applications/aTrust.app")).unwrap();
+        let app = listed(&roots);
+
+        let denied = |_: &Path| Err("Operation not permitted (os error 1)".to_string());
+        let r = uninstall_with(&app, &roots, false, &denied);
+        assert_eq!(r.failed.len(), 1);
+        assert_eq!(r.failed[0].reason, "它装在系统目录里，请点「在访达中显示」，把它拖到废纸篓并输入密码");
+        assert!(real.exists(), "没权限时什么都不该动");
+
+        // 别的原因照原样报，不冒充权限问题
+        let r = uninstall_with(&app, &roots, false, &|_| Err("别的错".into()));
+        assert_eq!(r.failed[0].reason, "别的错");
     }
 
     #[test]

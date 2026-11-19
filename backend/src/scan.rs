@@ -533,6 +533,7 @@ impl CategoryId {
         match self {
             Self::AppCache => "app_cache",
             Self::SystemCache => "system_cache",
+            Self::SystemLogs => "system_logs",
             Self::Trash => "trash",
             Self::OldDownloads => "old_downloads",
             Self::Logs => "logs",
@@ -574,6 +575,8 @@ pub fn default_rules(home: &Path) -> Vec<Rule> {
         Rule { skip_prefixes: &["com.apple.", "com.pikaclean.", "claude-cli-nodejs"], ..rule(CategoryId::AppCache, home.join("Library/Caches")) },
         // 清理它要输管理员密码，所以默认不勾选，免得每次清理都弹密码框
         Rule { needs_admin: true, default_selected: false, ..rule(CategoryId::SystemCache, PathBuf::from("/Library/Caches")) },
+        // 所有用户共用的日志（含崩溃报告），删掉后系统和应用会自己重建；同样要输管理员密码，默认不勾选
+        Rule { needs_admin: true, default_selected: false, ..rule(CategoryId::SystemLogs, PathBuf::from(crate::admin::SYSTEM_LOG_DIR)) },
         // 清空废纸篓不可恢复，而卸载、空间去向都对用户说过「清空前都能找回」，所以默认不勾选；快速清理和每周提醒也因此不碰它
         Rule { needs_full_disk_access: true, default_selected: false, ..rule(CategoryId::Trash, home.join(".Trash")) },
         // 个人文件：默认不勾选，只进废纸篓。排在「旧下载文件」前面，同一个安装包算在这一类
@@ -893,6 +896,16 @@ mod tests {
     fn trash_is_opt_in() {
         let rules = default_rules(Path::new("/nonexistent-home"));
         assert!(!rules.iter().find(|r| r.id == CategoryId::Trash).unwrap().default_selected);
+    }
+
+    /// 系统日志和系统缓存一样：删它要输管理员密码，所以默认不勾选
+    #[test]
+    fn system_logs_needs_admin_and_is_opt_in() {
+        let rules = default_rules(Path::new("/nonexistent-home"));
+        let r = rules.iter().find(|r| r.id == CategoryId::SystemLogs).unwrap();
+        assert_eq!(r.root, Path::new(crate::admin::SYSTEM_LOG_DIR));
+        assert!(r.needs_admin);
+        assert!(!r.default_selected);
     }
 
     fn rule(id: CategoryId, root: PathBuf) -> Rule {

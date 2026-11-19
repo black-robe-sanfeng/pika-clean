@@ -65,6 +65,8 @@ fn source(task: Task) -> String {
 
 /// 系统缓存所在的目录。以管理员身份删除时只认它的直接子项。
 const SYSTEM_CACHE_DIR: &str = "/Library/Caches";
+/// 所有用户共用的系统日志目录。以管理员身份删除时只认它的直接子项。
+pub const SYSTEM_LOG_DIR: &str = "/Library/Logs";
 /// 崩溃转储所在的目录。以管理员身份删除时只认它下面直接的 `core.<数字>` 文件。
 pub const CORES_DIR: &str = "/cores";
 /// 一次最多删这么多项，免得命令太长。
@@ -78,28 +80,29 @@ pub fn is_core_dump_name(name: &str) -> bool {
 /// 把要删的路径变成一条命令，连同密码框上的说明。任何一个路径不合规就整批拒绝，一个都不删。
 ///
 /// 这是全应用最危险的一处：命令会以 root 身份执行。所以规则写得很死——
-/// 路径必须是「/Library/Caches/名字」，名字里只能有字母、数字、点、下划线、连字符和空格；
+/// 路径必须是「/Library/Caches/名字」或「/Library/Logs/名字」，名字里只能有字母、数字、点、下划线、连字符和空格；
 /// 或者是「/cores/core.数字」。这样拼进命令时不可能带上引号、斜杠、通配符或 `..`。
 fn remove_script(paths: &[std::path::PathBuf]) -> Result<(String, &'static str), AdminError> {
     if paths.is_empty() || paths.len() > MAX_PATHS {
         return Err(AdminError::Failed(t("要删除的条目数量不对").into()));
     }
-    let (mut caches, mut cores) = (String::new(), String::new());
+    let (mut shared, mut cores) = (String::new(), String::new());
     for p in paths {
         let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
         let parent = p.parent().and_then(|d| d.to_str());
-        let ok_cache = !name.is_empty() && name != "." && name != ".." && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ' '));
+        let ok_name = !name.is_empty() && name != "." && name != ".." && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ' '));
         match parent {
-            Some(SYSTEM_CACHE_DIR) if ok_cache => caches.push_str(&format!(" '{SYSTEM_CACHE_DIR}/{name}'")),
+            Some(SYSTEM_CACHE_DIR) if ok_name => shared.push_str(&format!(" '{SYSTEM_CACHE_DIR}/{name}'")),
+            Some(SYSTEM_LOG_DIR) if ok_name => shared.push_str(&format!(" '{SYSTEM_LOG_DIR}/{name}'")),
             Some(CORES_DIR) if is_core_dump_name(name) => cores.push_str(&format!(" '{CORES_DIR}/{name}'")),
             _ => return Err(AdminError::Failed(format!("{}{}", t("拒绝以管理员身份删除这个路径："), p.display()))),
         }
     }
     // 崩溃转储是普通文件，不带 -r：万一在密码框弹出期间被换成了目录，也不会删进去；rm 本身不跟随符号链接
-    Ok(match (caches.is_empty(), cores.is_empty()) {
-        (false, true) => (format!("/bin/rm -rf --{caches}"), t("Pika Clean 要清理所有用户共用的系统缓存。")),
+    Ok(match (shared.is_empty(), cores.is_empty()) {
+        (false, true) => (format!("/bin/rm -rf --{shared}"), t("Pika Clean 要清理所有用户共用的系统缓存和日志。")),
         (true, false) => (format!("/bin/rm -f --{cores}"), t("Pika Clean 要删除程序崩溃时留下的内存转储。")),
-        _ => (format!("/bin/rm -rf --{caches}; /bin/rm -f --{cores}"), t("Pika Clean 要清理系统缓存和程序崩溃时留下的内存转储。")),
+        _ => (format!("/bin/rm -rf --{shared}; /bin/rm -f --{cores}"), t("Pika Clean 要清理系统缓存、系统日志和程序崩溃时留下的内存转储。")),
     })
 }
 
@@ -236,6 +239,19 @@ mod tests {
         }
         assert!(remove_script(&[]).is_err());
         assert!(remove_script(&vec![p("/Library/Caches/x"); MAX_PATHS + 1]).is_err());
+    }
+
+    #[test]
+    fn 系统日志的删除命令只接受规定目录下的简单名字() {
+        let p = |s: &str| std::path::PathBuf::from(s);
+        let script = remove_script(&[p("/Library/Logs/DiagnosticReports"), p("/Library/Logs/foo bar.log")]).unwrap().0;
+        assert_eq!(script, "/bin/rm -rf -- '/Library/Logs/DiagnosticReports' '/Library/Logs/foo bar.log'");
+        // 缓存和日志混在一批里，用一条命令删完，只弹一次密码框
+        let script = remove_script(&[p("/Library/Caches/a"), p("/Library/Logs/b")]).unwrap().0;
+        assert_eq!(script, "/bin/rm -rf -- '/Library/Caches/a' '/Library/Logs/b'");
+        for bad in ["/Library/Logs", "/Library/Logs/..", "/Library/Logs/a/b", "/Library/Logs/$(reboot)", "/Library/Logs/*", "/etc/hosts"] {
+            assert!(remove_script(&[p(bad)]).is_err(), "应当拒绝 {bad}");
+        }
     }
 
     #[test]

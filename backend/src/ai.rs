@@ -1185,6 +1185,7 @@ mod tests {
             bundle_id: "com.example.demo".into(),
             version: "1".into(),
             path: "/Applications/Demo.app".into(),
+            link: None,
             size_bytes: 1,
             last_used_ms: None,
             created_ms: None,

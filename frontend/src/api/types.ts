@@ -74,6 +74,7 @@ export interface DeviceInfo {
 export type CategoryId =
   | 'app_cache'
   | 'system_cache'
+  | 'system_logs'
   | 'trash'
   | 'old_downloads'
   | 'logs'
